@@ -29,6 +29,12 @@ pub enum DiscoveryError {
 #[derive(thiserror::Error)]
 #[non_exhaustive]
 pub enum TransportError {
+  /// The channel has explicitly been closed.
+  #[error("transport channel is closed")]
+  Closed,
+  /// Incremental framing or wire-line validation failed.
+  #[error("transport framing failed")]
+  Protocol(#[from] assuan_protocol::ProtocolError),
   /// Protected storage could not be allocated or its limit was exceeded.
   #[error("transport storage limit failure")]
   Limit(#[from] assuan_protocol::LimitError),
@@ -55,6 +61,8 @@ pub enum TransportError {
 impl fmt::Debug for TransportError {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
+      Self::Closed => return f.write_str("Closed"),
+      Self::Protocol(error) => return f.debug_tuple("Protocol").field(error).finish(),
       Self::Limit(error) => return f.debug_tuple("Limit").field(error).finish(),
       Self::Io(error) => {
         return f.debug_struct("Io").field("kind", &error.kind()).finish_non_exhaustive();

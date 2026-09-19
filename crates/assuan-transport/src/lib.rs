@@ -20,3 +20,6 @@ mod windows;
 
 mod discovery;
 pub use discovery::{AgentLocator, ResolvedEndpoint};
+
+mod channel;
+pub use channel::Channel;

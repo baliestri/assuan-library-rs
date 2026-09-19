@@ -17,6 +17,7 @@ pub struct LineBuffer {
   storage: Zeroizing<[u8; MAX_LINE_BYTES]>,
   len: usize,
   ready: bool,
+  content_len: usize,
   failed: bool,
 }
 
@@ -28,6 +29,7 @@ impl LineBuffer {
       storage: Zeroizing::new([0; MAX_LINE_BYTES]),
       len: 0,
       ready: false,
+      content_len: 0,
       failed: false,
     };
   }
@@ -54,6 +56,10 @@ impl LineBuffer {
       self.storage[self.len] = *byte;
       self.len += 1;
       if *byte == b'\n' {
+        self.content_len = self.len - 1;
+        if self.content_len > 0 && self.storage[self.content_len - 1] == b'\r' {
+          self.content_len -= 1;
+        }
         self.ready = true;
         return Ok(index + 1);
       }
@@ -72,11 +78,18 @@ impl LineBuffer {
     if !self.ready {
       return None;
     }
-    let mut end = self.len - 1;
-    if end > 0 && self.storage[end - 1] == b'\r' {
-      end -= 1;
-    }
-    return Some(&self.storage[..end]);
+    return Some(&self.storage[..self.content_len]);
+  }
+
+  /// Mutably borrows a complete line for in-place decoding, excluding CRLF/LF.
+  ///
+  /// The borrow prevents feeding or clearing the buffer until it ends. Bytes
+  /// outside the slice, including terminators, remain inaccessible and are
+  /// wiped together with the rest of the storage by [`Self::clear`].
+  #[must_use]
+  pub fn line_mut(&mut self) -> Option<&mut [u8]> {
+    let len = self.line()?.len();
+    return Some(&mut self.storage[..len]);
   }
 
   /// Wipes all storage and resets local framing state for the next line.
@@ -84,6 +97,7 @@ impl LineBuffer {
     self.storage[..].zeroize();
     self.len = 0;
     self.ready = false;
+    self.content_len = 0;
     self.failed = false;
   }
 
@@ -126,6 +140,20 @@ impl fmt::Debug for LineBuffer {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn mutable_decoding_and_reuse_leave_no_old_bytes() {
+    let mut buffer = LineBuffer::new();
+    buffer.feed(b"D secret%00\n").unwrap();
+    let line = buffer.line_mut().unwrap();
+    line.fill(b'\r');
+    assert_eq!(buffer.line().unwrap().len(), 11);
+    assert_eq!(buffer.line_mut().unwrap().len(), 11);
+    buffer.clear();
+    buffer.feed(b"OK\n").unwrap();
+    assert_eq!(buffer.line_mut().unwrap(), b"OK");
+    assert!(buffer.storage[3..].iter().all(|byte| return *byte == 0));
+  }
 
   #[test]
   fn clear_and_overflow_wipe_every_byte() {

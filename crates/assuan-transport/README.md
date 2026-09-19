@@ -2,7 +2,7 @@
 
 Extensible asynchronous byte streams and TCP listeners/connectors for Assuan.
 This crate implements TCP, Unix sockets, Windows named pipes, and custom streams.
-Agent discovery is supported; shared protocol framing is planned.
+Agent discovery and bounded asynchronous line framing are supported.
 
 ## TCP
 
@@ -110,6 +110,48 @@ with an explicit endpoint does not require `GnuPG`.
 
 The process fixture tests require the `test-fixtures` feature:
 `cargo test -p assuan-transport --features test-fixtures`.
+
+## Asynchronous framing
+
+`Channel` owns a `Stream` and fixed heap buffers for read-ahead, the current
+line, and outgoing bytes. `read_line` returns a mutable borrowed slice without
+LF or CRLF, suitable for in-place decoding. Multiple lines received together
+remain available without another stream read. The wire limit is 1000 bytes,
+including the terminator.
+
+`write_line` accepts one already encoded line **including its LF**. It validates
+length and framing before writing, then completes partial writes and flushes
+under one absolute deadline. It does not encode or classify payload contents.
+
+```rust
+use assuan_protocol::Sensitivity;
+use assuan_transport::{Channel, Stream};
+use tokio::{io::AsyncWriteExt, time::{Duration, Instant}};
+
+# #[tokio::main(flavor = "current_thread")]
+# async fn main() -> Result<(), Box<dyn std::error::Error>> {
+let (stream, mut peer) = tokio::io::duplex(64);
+peer.write_all(b"D hello\nOK\n").await?;
+let mut channel = Channel::new(Stream::new(stream));
+let deadline = Instant::now() + Duration::from_secs(1);
+assert_eq!(channel.read_line(deadline, Sensitivity::Public).await?, b"D hello");
+assert_eq!(channel.read_line(deadline, Sensitivity::Public).await?, b"OK");
+channel.close();
+# Ok(())
+# }
+```
+
+All internal buffers are wiped regardless of sensitivity: read-ahead can hold
+secret data before the session has classified it. Consumed read-ahead bytes and
+successful outgoing writes are wiped promptly; the borrowed line is wiped before
+the next read. Errors, cancellation of an active operation, explicit close, and
+normal drop wipe storage. The caller's write slice and OS buffers remain the
+caller's and operating system's responsibility.
+
+The channel does not own session state. A failed or cancelled operation may have
+consumed or delivered bytes, so the session owner must invalidate the session
+before reuse. EOF while waiting for a line is an error. Closing immediately drops
+the stream without flushing or performing an Assuan shutdown exchange.
 
 ## Custom transports
 
