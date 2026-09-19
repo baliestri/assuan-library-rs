@@ -93,3 +93,39 @@ impl fmt::Display for ParseError {
 }
 
 impl core::error::Error for ParseError {}
+
+/// A failure to encode an expression without exceeding the default limits.
+///
+/// Errors contain no atom contents. Encoding errors leave existing output
+/// bytes and length unchanged.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum EncodeError {
+    /// The final output buffer would exceed the byte limit.
+    SizeLimit,
+    /// An atom exceeds the payload byte limit.
+    AtomLimit,
+    /// The expression contains too many atoms and lists.
+    NodeLimit,
+    /// The expression contains too many nested lists.
+    DepthLimit,
+    /// A size calculation overflowed.
+    LengthOverflow,
+    /// Traversal or output storage could not be reserved.
+    AllocationFailed,
+}
+
+impl fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::SizeLimit => "canonical output byte limit exceeded",
+            Self::AtomLimit => "atom byte limit exceeded",
+            Self::NodeLimit => "expression node limit exceeded",
+            Self::DepthLimit => "list nesting limit exceeded",
+            Self::LengthOverflow => "canonical output length overflow",
+            Self::AllocationFailed => "could not reserve encoding storage",
+        })
+    }
+}
+
+impl core::error::Error for EncodeError {}

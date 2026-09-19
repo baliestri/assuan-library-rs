@@ -1,6 +1,6 @@
 [package]
 name = "assuan-sexpr"
-description = "A borrowing parser for bounded canonical S-expressions"
+description = "Bounded canonical S-expression parsing and encoding with borrowed atoms"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,6 +15,9 @@ readme = "README.md"
 [features]
 default = ["std"]
 std = []
+
+[dev-dependencies]
+proptest.workspace = true
 
 [lints]
 workspace = true

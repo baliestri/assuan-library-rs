@@ -7,8 +7,9 @@ mod error;
 mod limits;
 mod parser;
 mod value;
+mod writer;
 
-pub use error::{ParseError, ParseErrorKind};
+pub use error::{EncodeError, ParseError, ParseErrorKind};
 pub use limits::{MAX_NESTING_DEPTH, ParseLimits};
 pub use parser::{parse_complete, parse_prefix};
-pub use value::Sexpr;
+pub use value::{OwnedSexpr, Sexpr};

@@ -30,7 +30,7 @@ expression shows its structure and atom lengths without exposing contents.
 The parser does not erase borrowed input; callers retain responsibility for
 protecting sensitive data.
 
-Owned values and canonical encoding are not implemented in this first stage.
+Use `Sexpr::to_owned` to copy atoms and list structure into an `OwnedSexpr` that outlives the input. `to_canonical` produces canonical bytes; `write_canonical` appends them to an existing vector. Encoding applies the default parsing limits, including to manually constructed trees. The output byte limit includes existing bytes when appending. Failures leave output contents and length unchanged. These owned values and output buffers are ordinary memory, not secret storage.
 
 ## License
 
