@@ -1,6 +1,6 @@
 //! User-provided transports and listeners delegate I/O without unsafe code.
 
-use assuan_transport::{Accepted, Acceptor, Endpoint, IoFuture, Stream, TransportError};
+use assuan_transport::{Accepted, Acceptor, IoFuture, Stream, TransportError};
 use std::{
   io,
   pin::Pin,
@@ -69,7 +69,6 @@ async fn vectored_write_flush_and_shutdown_reach_the_custom_stream() {
 
 struct CustomAcceptor {
   stream: Option<Stream>,
-  endpoint: Endpoint,
 }
 
 impl Acceptor for CustomAcceptor {
@@ -81,9 +80,6 @@ impl Acceptor for CustomAcceptor {
       });
     });
   }
-  fn endpoint(&self) -> &Endpoint {
-    return &self.endpoint;
-  }
 }
 
 #[tokio::test]
@@ -91,8 +87,23 @@ async fn acceptor_is_object_safe_and_supports_custom_streams() {
   let (left, _right) = tokio::io::duplex(4);
   let mut acceptor: Box<dyn Acceptor> = Box::new(CustomAcceptor {
     stream: Some(Stream::new(left)),
-    endpoint: Endpoint::Tcp("127.0.0.1:1".parse().unwrap()),
   });
+  assert!(acceptor.endpoint().is_none());
   assert!(acceptor.accept().await.unwrap().peer.is_none());
   assert!(acceptor.accept().await.is_err());
+}
+
+#[tokio::test]
+async fn standard_listener_exposes_the_same_address_through_the_trait() {
+  use assuan_transport::{Endpoint, ListenOptions, Listener};
+  let listener =
+    Listener::bind(&Endpoint::Tcp("127.0.0.1:0".parse().unwrap()), &ListenOptions::default())
+      .await
+      .unwrap();
+  let acceptor: &dyn Acceptor = &listener;
+  assert_eq!(acceptor.endpoint(), Some(listener.endpoint()));
+  let Endpoint::Tcp(address) = listener.endpoint() else {
+    panic!("unexpected endpoint");
+  };
+  assert_ne!(address.port(), 0);
 }

@@ -24,8 +24,13 @@ pub trait Acceptor: Send {
   /// Returns typed I/O or access-policy failures from the implementation.
   fn accept(&mut self) -> IoFuture<'_, Accepted>;
 
-  /// Returns the actual bound endpoint, including an OS-assigned TCP port.
-  fn endpoint(&self) -> &Endpoint;
+  /// Returns a standard transport address when the implementation has one.
+  ///
+  /// Defaults to `None`. Custom listeners need not invent an address or extend
+  /// [`Endpoint`]. This optional metadata does not control connection acceptance.
+  fn endpoint(&self) -> Option<&Endpoint> {
+    return None;
+  }
 }
 
 /// A standard transport listener. Dropping it closes its listening socket.
@@ -43,10 +48,19 @@ enum Backend {
 }
 
 impl Listener {
+  /// Borrows the actual bound address, including an OS-assigned TCP port.
+  ///
+  /// Standard listeners always have an endpoint. Through [`Acceptor`], the
+  /// same address is returned as `Some`; custom listeners may return `None`.
+  #[must_use]
+  pub fn endpoint(&self) -> &Endpoint {
+    return &self.endpoint;
+  }
+
   /// Binds an explicitly selected endpoint in a Tokio runtime with I/O enabled.
   ///
   /// TCP does not apply the local-user policy: it has no OS peer credentials.
-  /// Port zero is replaced by the actual bound port in [`Acceptor::endpoint`].
+  /// Port zero is replaced by the actual bound port in [`Self::endpoint`].
   ///
   /// # Errors
   /// Returns [`TransportError::Io`] if binding or querying the socket fails, or
@@ -126,8 +140,8 @@ impl Acceptor for Listener {
     });
   }
 
-  fn endpoint(&self) -> &Endpoint {
-    return &self.endpoint;
+  fn endpoint(&self) -> Option<&Endpoint> {
+    return Some(&self.endpoint);
   }
 }
 

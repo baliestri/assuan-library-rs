@@ -8,7 +8,7 @@ Agent discovery and bounded asynchronous line framing are supported.
 
 Run inside a Tokio runtime with I/O and time enabled. Connections have a total
 ten-second timeout by default. Binding port zero returns the actual OS-selected
-port through `Acceptor::endpoint`.
+port through `Listener::endpoint`.
 
 ```rust
 use assuan_transport::{Acceptor, ConnectOptions, Endpoint, ListenOptions, Listener};
@@ -170,6 +170,23 @@ let stream = Stream::new(left);
 assert_eq!(format!("{stream:?}"), "Stream { .. }");
 drop(right);
 ```
+
+Custom listeners implement `Acceptor::accept`; `Acceptor::endpoint` defaults to
+`None`. An in-memory or external backend does not need a fictitious TCP address
+or a new `Endpoint` variant. Standard `Listener` values expose their address
+through the inherent `endpoint()` method and return `Some` through the trait.
+Connection setup for a custom backend belongs to the caller, who passes the
+connected stream to `Stream::new`. No discovery executable is needed.
+
+Custom stream types must satisfy `AsyncRead + AsyncWrite + Unpin + Send + 'static`.
+They must preserve byte ordering and implement wakeups, partial writes, flush,
+and shutdown according to the Tokio traits. Document cancellation behavior of
+both connection acceptance and stream operations. Authentication, encryption,
+and peer-identity guarantees belong to the custom backend; use `peer: None`
+when no OS-authenticated identity is available. In-memory streams and externally
+provided TLS byte streams can be wrapped; message-oriented protocols require a
+byte-stream adapter first. Separate input/output handles can likewise be joined
+by an adapter implementing reads on the input and writes on the output.
 
 The wrapper does not wipe caller buffers or OS buffers. Session ownership,
 transaction cancellation, framing, and sensitive-data handling belong to higher
