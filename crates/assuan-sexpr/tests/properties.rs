@@ -4,19 +4,19 @@ use assuan_sexpr::{ParseLimits, Sexpr, parse_complete};
 use proptest::prelude::*;
 
 fn canonical_wire() -> impl Strategy<Value = Vec<u8>> {
-    let atom = proptest::collection::vec(any::<u8>(), 0..64).prop_map(|bytes| {
-        let mut wire = format!("{}:", bytes.len()).into_bytes();
-        wire.extend(bytes);
-        wire
+  let atom = proptest::collection::vec(any::<u8>(), 0..64).prop_map(|bytes| {
+    let mut wire = format!("{}:", bytes.len()).into_bytes();
+    wire.extend(bytes);
+    return wire;
+  });
+  return atom.prop_recursive(5, 96, 4, |inner| {
+    return proptest::collection::vec(inner, 0..5).prop_map(|children| {
+      let mut wire = vec![b'('];
+      wire.extend(children.into_iter().flatten());
+      wire.push(b')');
+      return wire;
     });
-    atom.prop_recursive(5, 96, 4, |inner| {
-        proptest::collection::vec(inner, 0..5).prop_map(|children| {
-            let mut wire = vec![b'('];
-            wire.extend(children.into_iter().flatten());
-            wire.push(b')');
-            wire
-        })
-    })
+  });
 }
 
 proptest! {

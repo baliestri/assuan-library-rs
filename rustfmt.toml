@@ -1,0 +1,36 @@
+# Generated with https://baliestri.github.io/rustfmt-generator/
+# Options marked "nightly" need the nightly toolchain: cargo +nightly fmt
+
+# Width & heuristics
+use_small_heuristics = "Off"
+
+# Indentation & whitespace
+tab_spaces = 2
+newline_style = "Unix"
+
+# Comments & docs
+wrap_comments = true # nightly
+normalize_comments = true # nightly
+normalize_doc_attributes = true # nightly
+format_code_in_doc_comments = true # nightly
+
+# Imports & modules
+imports_granularity = "Crate" # nightly
+group_imports = "StdExternalCrate" # nightly
+
+# Items & blocks
+brace_style = "PreferSameLine" # nightly
+where_single_line = true # nightly
+reorder_impl_items = true # nightly
+force_multiline_blocks = true # nightly
+
+# Expressions & punctuation
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# Macros & literals
+hex_literal_case = "Upper" # nightly
+
+# Edition
+edition = "2024"
+style_edition = "2024"
