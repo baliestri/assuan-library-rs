@@ -1,0 +1,31 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+exclude = ["fuzz"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98.1"
+license = "MIT"
+authors = ["Bruno Sales <me@baliestri.dev>"]
+repository = "https://github.com/baliestri/assuan-library-rs"
+homepage = "https://github.com/baliestri/assuan-library-rs"
+keywords = ["assuan", "gnupg", "gpg-agent", "protocol", "ipc"]
+categories = ["network-programming", "parser-implementations"]
+
+[workspace.dependencies]
+thiserror = { version = "2", default-features = false }
+tokio = "1"
+proptest = "1"
+trybuild = "1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
