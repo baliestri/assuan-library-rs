@@ -15,6 +15,7 @@ keywords = ["assuan", "gnupg", "gpg-agent", "protocol", "ipc"]
 categories = ["network-programming", "parser-implementations"]
 
 [workspace.dependencies]
+zeroize = { version = "1", default-features = false, features = ["alloc"] }
 thiserror = { version = "2", default-features = false }
 tokio = "1"
 proptest = "1"
