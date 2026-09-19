@@ -4,9 +4,9 @@ A Rust library planned for the [Assuan protocol](https://gnupg.org/documentation
 
 ## Project status
 
-The repository currently contains the initial workspace configuration only. No crates or Rust implementation have been added yet, and no package has been published.
+The first implementation stage provides the canonical S-expression parser in `assuan-sexpr`. The remaining crates and asynchronous protocol integration are under development. No package has been published.
 
-## Planned crates
+## Workspace design
 
 | Crate | Responsibility |
 | --- | --- |
@@ -29,7 +29,7 @@ The repository currently contains the initial workspace configuration only. No c
 
 ## Toolchain
 
-The workspace is configured for Rust 1.98.1 and edition 2024. Formatting and linting use rustfmt and Clippy. Cargo build and test commands will become available as crates are added.
+The workspace is configured for Rust 1.98.1 and edition 2024. Formatting and linting use rustfmt and Clippy. Run `cargo test -p assuan-sexpr` to check the parser and its documentation examples.
 
 ## License
 
