@@ -36,6 +36,8 @@ pub struct Listener {
 
 enum Backend {
   Tcp(tokio::net::TcpListener),
+  #[cfg(windows)]
+  NamedPipe(crate::windows::PipeListener),
   #[cfg(unix)]
   Unix(crate::unix::UnixListener),
 }
@@ -54,6 +56,14 @@ impl Listener {
   /// Panics if called without a Tokio runtime with its I/O driver enabled.
   pub async fn bind(endpoint: &Endpoint, _options: &ListenOptions) -> Result<Self, TransportError> {
     match endpoint {
+      #[cfg(windows)]
+      Endpoint::NamedPipe(path) => {
+        let inner = crate::windows::PipeListener::bind(path)?;
+        return Ok(Self {
+          inner: Backend::NamedPipe(inner),
+          endpoint: endpoint.clone(),
+        });
+      }
       Endpoint::Tcp(address) => {
         let inner = tokio::net::TcpListener::bind(address).await?;
         let endpoint = Endpoint::Tcp(inner.local_addr()?);
@@ -77,7 +87,7 @@ impl Listener {
   ///
   /// Checks the private parent directory's owner, permissions, device and inode,
   /// and the socket's type, owner, device and inode. Success closes the listener;
-  /// repeated cleanup is harmless. TCP cleanup is a no-op. Drop only closes the
+  /// repeated cleanup is harmless. TCP and named-pipe cleanup are no-ops. Drop only closes the
   /// listener and never removes a pathname. Same-user and privileged processes
   /// must be trusted: pathname checks cannot prevent their concurrent mutations.
   ///
@@ -87,6 +97,8 @@ impl Listener {
   /// when detected. On failure the listener remains available for explicit handling.
   pub fn cleanup(&mut self) -> Result<(), TransportError> {
     match &mut self.inner {
+      #[cfg(windows)]
+      Backend::NamedPipe(_) => return Ok(()),
       Backend::Tcp(_) => return Ok(()),
       #[cfg(unix)]
       Backend::Unix(listener) => return listener.cleanup(),
@@ -99,6 +111,8 @@ impl Acceptor for Listener {
   fn accept(&mut self) -> IoFuture<'_, Accepted> {
     return Box::pin(async move {
       match &self.inner {
+        #[cfg(windows)]
+        Backend::NamedPipe(listener) => return listener.accept().await,
         Backend::Tcp(listener) => {
           let (stream, _) = listener.accept().await?;
           return Ok(Accepted {

@@ -9,6 +9,9 @@ pub enum Endpoint {
   /// TCP does not authenticate a local OS user. Bind loopback when remote
   /// exposure is unnecessary; application authentication is a separate layer.
   Tcp(SocketAddr),
+  /// A local Windows byte pipe, restricted to the current user when listening.
+  #[cfg(windows)]
+  NamedPipe(std::path::PathBuf),
   /// A filesystem Unix socket. Listeners require a private, user-owned parent directory.
   #[cfg(unix)]
   Unix(std::path::PathBuf),

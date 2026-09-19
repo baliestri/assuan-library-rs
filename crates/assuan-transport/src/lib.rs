@@ -14,3 +14,6 @@ pub use tcp::connect;
 
 #[cfg(unix)]
 mod unix;
+
+#[cfg(windows)]
+mod windows;

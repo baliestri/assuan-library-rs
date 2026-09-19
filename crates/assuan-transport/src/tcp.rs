@@ -22,6 +22,8 @@ pub async fn connect(
 ) -> Result<Stream, TransportError> {
   return within_deadline(options, async {
     match endpoint {
+      #[cfg(windows)]
+      Endpoint::NamedPipe(path) => return crate::windows::connect(path).await,
       Endpoint::Tcp(address) => {
         if address.port() == 0 || address.ip().is_unspecified() {
           return Err(TransportError::InvalidEndpoint);

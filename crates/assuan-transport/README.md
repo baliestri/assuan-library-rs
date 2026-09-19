@@ -1,8 +1,8 @@
 # assuan-transport
 
 Extensible asynchronous byte streams and TCP listeners/connectors for Assuan.
-This crate currently implements TCP, Unix sockets, and custom streams. Windows
-named pipes, endpoint discovery, and shared protocol framing are planned.
+This crate implements TCP, Unix sockets, Windows named pipes, and custom streams.
+Endpoint discovery and shared protocol framing are planned.
 
 ## TCP
 
@@ -56,6 +56,29 @@ repeated successful cleanup is harmless. Drop closes the listener without
 unlinking any pathname. Other processes running as the same user, and privileged
 processes, must be trusted: pathname checks cannot prevent their concurrent
 mutations. This policy isolates different unprivileged OS users.
+
+## Windows named pipes
+
+`Endpoint::NamedPipe` accepts local paths such as `\\.\pipe\assuan-example`.
+Remote names, embedded NUL, empty names, nested separators, and paths longer than
+256 UTF-16 code units are rejected. Listeners use byte mode, reject remote
+clients, and create noninheritable handles. An existing pipe name is rejected.
+
+Before creating the first instance, the listener queries the process token's
+user SID and installs an explicit protected DACL with one allow entry for that
+SID. ACL construction failure aborts binding; no default or null DACL is used.
+This does not populate `Accepted::peer`: an access policy is not independently
+queried peer identity. The native listener keeps one waiting instance in addition
+to accepted connections; application session limits must account for it.
+
+A busy-pipe connection retries asynchronously with a short timer under the total
+connection deadline. Cancellation does not leave a blocking connection worker.
+The adapter's flush is a no-op because writes already reach the kernel buffer;
+it does not wait for the peer to consume them. Shutdown closes both directions,
+and Drop closes directly without starting the backend's background drain.
+Unread buffered data may be discarded. Higher-level protocols must complete
+required acknowledgements before closing, and must not assume TCP half-close
+semantics. No raw Windows APIs or unsafe code are used in this workspace.
 
 ## Custom transports
 
