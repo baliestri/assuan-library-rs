@@ -3,9 +3,15 @@
 
 extern crate alloc;
 
+mod command;
 mod error;
+mod escape;
 mod limits;
+mod message;
 mod secret;
 
-pub use error::LimitError;
+pub use command::Command;
+pub use error::{LimitError, ProtocolError};
+pub use escape::decode_data_in_place;
+pub use message::{ServerLine, parse_server_line};
 pub use secret::{PayloadRef, SecretBytes, SecretRef, Sensitivity};

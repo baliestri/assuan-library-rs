@@ -23,3 +23,33 @@ impl fmt::Display for LimitError {
 }
 
 impl core::error::Error for LimitError {}
+
+/// A malformed protocol field, without any input bytes in its diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ProtocolError {
+  /// A line contains a forbidden NUL, CR, or LF byte.
+  InvalidLine,
+  /// A command name or keyword is missing or violates its ASCII grammar.
+  InvalidToken,
+  /// The response category or its separators are invalid.
+  InvalidResponse,
+  /// A remote error code is missing, nondecimal, or larger than `u32::MAX`.
+  InvalidErrorCode,
+  /// A percent escape is incomplete or contains a nonhexadecimal digit.
+  InvalidEscape,
+}
+
+impl fmt::Display for ProtocolError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    return f.write_str(match self {
+      Self::InvalidLine => "invalid byte in protocol line",
+      Self::InvalidToken => "invalid protocol token",
+      Self::InvalidResponse => "invalid server response",
+      Self::InvalidErrorCode => "invalid remote error code",
+      Self::InvalidEscape => "invalid percent escape",
+    });
+  }
+}
+
+impl core::error::Error for ProtocolError {}
