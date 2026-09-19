@@ -4,7 +4,7 @@ A Rust library planned for the [Assuan protocol](https://gnupg.org/documentation
 
 ## Project status
 
-The workspace currently provides bounded canonical S-expression parsing and encoding in `assuan-sexpr`, and protected buffers, wire parsing, framing, encoding, and pure session state machines in `assuan-protocol`, plus TCP, Unix sockets, Windows named pipes, and custom asynchronous streams in `assuan-transport`. The remaining crates and asynchronous protocol integration are under development. No package has been published.
+The workspace currently provides bounded canonical S-expression parsing and encoding in `assuan-sexpr`, and protected buffers, wire parsing, framing, encoding, and pure session state machines in `assuan-protocol`, plus TCP, Unix sockets, Windows named pipes, custom asynchronous streams, and native agent discovery in `assuan-transport`. The remaining crates and asynchronous protocol integration are under development. No package has been published.
 
 ## Workspace design
 
@@ -29,7 +29,7 @@ The workspace currently provides bounded canonical S-expression parsing and enco
 
 ## Toolchain
 
-The workspace is configured for Rust 1.98.1 and edition 2024. Formatting and linting use rustfmt and Clippy. Run `cargo test --workspace` to check the implemented crates and their documentation examples.
+The workspace is configured for Rust 1.98.1 and edition 2024. Formatting and linting use rustfmt and Clippy. Run `cargo test --workspace --features assuan-transport/test-fixtures` to check the implemented crates and their documentation examples.
 
 ## License
 

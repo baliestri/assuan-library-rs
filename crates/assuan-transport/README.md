@@ -2,7 +2,7 @@
 
 Extensible asynchronous byte streams and TCP listeners/connectors for Assuan.
 This crate implements TCP, Unix sockets, Windows named pipes, and custom streams.
-Endpoint discovery and shared protocol framing are planned.
+Agent discovery is supported; shared protocol framing is planned.
 
 ## TCP
 
@@ -79,6 +79,37 @@ and Drop closes directly without starting the backend's background drain.
 Unread buffered data may be discarded. Higher-level protocols must complete
 required acknowledgements before closing, and must not assume TCP half-close
 semantics. No raw Windows APIs or unsafe code are used in this workspace.
+
+## Agent discovery
+
+`AgentLocator` invokes an explicitly selected `gpgconf` executable without a
+shell. Discovery has a five-second deadline and a combined one-MiB output limit.
+Unix path bytes are preserved. Windows native socket files are parsed as a port
+and 16 binary nonce bytes, with protected storage and redacted diagnostics.
+Cygwin socket files are not supported.
+
+```rust,no_run
+use assuan_transport::{AgentLocator, ConnectOptions};
+use std::path::PathBuf;
+
+# #[tokio::main(flavor = "current_thread")]
+# async fn main() -> Result<(), Box<dyn std::error::Error>> {
+let locator = AgentLocator::new(PathBuf::from("gpgconf"), None);
+let resolved = locator.resolve().await?;
+let stream = resolved.connect(&ConnectOptions::default()).await?;
+// The session layer can now read the greeting from stream.
+# drop(stream);
+# Ok(())
+# }
+```
+
+Use `resolved.connect(...)` to include the native Windows nonce handshake.
+The generic connector given only `resolved.endpoint()` does not send the nonce.
+Discovery does not launch an agent or consume its greeting. Connecting directly
+with an explicit endpoint does not require `GnuPG`.
+
+The process fixture tests require the `test-fixtures` feature:
+`cargo test -p assuan-transport --features test-fixtures`.
 
 ## Custom transports
 

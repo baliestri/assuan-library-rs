@@ -13,8 +13,10 @@ categories.workspace = true
 readme = "README.md"
 
 [dependencies]
-tokio = { workspace = true, features = ["net", "io-util", "time", "rt"] }
+tokio = { workspace = true, features = ["net", "io-util", "time", "rt", "process"] }
 thiserror.workspace = true
+zeroize.workspace = true
+assuan-protocol = { version = "0.1.0", path = "../assuan-protocol" }
 
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["process"] }
@@ -30,3 +32,13 @@ tokio = { workspace = true, features = ["macros", "test-util"] }
 
 [lints]
 workspace = true
+
+[features]
+test-fixtures = []
+
+[[bin]]
+name = "gpgconf_stub"
+path = "tests/fixtures/gpgconf_stub.rs"
+required-features = ["test-fixtures"]
+test = false
+bench = false

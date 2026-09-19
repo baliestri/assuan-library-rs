@@ -4,6 +4,12 @@ use std::{fmt, io};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum DiscoveryError {
+  /// The discovery process returned an unsuccessful exit status.
+  #[error("endpoint discovery process failed")]
+  ProcessFailed,
+  /// The endpoint file uses an unsupported emulation format.
+  #[error("unsupported endpoint file format")]
+  UnsupportedFormat,
   /// No usable endpoint was found.
   #[error("no endpoint was found")]
   NotFound,
@@ -23,6 +29,9 @@ pub enum DiscoveryError {
 #[derive(thiserror::Error)]
 #[non_exhaustive]
 pub enum TransportError {
+  /// Protected storage could not be allocated or its limit was exceeded.
+  #[error("transport storage limit failure")]
+  Limit(#[from] assuan_protocol::LimitError),
   /// An operating-system or custom transport I/O operation failed.
   #[error("transport I/O failed")]
   Io(#[from] io::Error),
@@ -46,6 +55,7 @@ pub enum TransportError {
 impl fmt::Debug for TransportError {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
+      Self::Limit(error) => return f.debug_tuple("Limit").field(error).finish(),
       Self::Io(error) => {
         return f.debug_struct("Io").field("kind", &error.kind()).finish_non_exhaustive();
       }

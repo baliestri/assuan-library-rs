@@ -17,3 +17,6 @@ mod unix;
 
 #[cfg(windows)]
 mod windows;
+
+mod discovery;
+pub use discovery::{AgentLocator, ResolvedEndpoint};
