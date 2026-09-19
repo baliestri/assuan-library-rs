@@ -8,6 +8,8 @@ use std::fmt;
 /// Debug omits all received strings, including status keywords.
 #[non_exhaustive]
 pub enum Event<'a> {
+  /// Exclusive request for client-provided data; finish or cancel before reading again.
+  Inquire(crate::Inquiry<'a>),
   /// A decoded data segment; does not complete the transaction.
   Data(PayloadRef<'a>),
   /// Informational status with unmodified arguments.
@@ -33,6 +35,7 @@ pub enum Event<'a> {
 impl fmt::Debug for Event<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     return f.write_str(match self {
+      Self::Inquire(_) => "Inquire { .. }",
       Self::Data(_) => "Data { .. }",
       Self::Status {
         ..
@@ -72,44 +75,14 @@ impl Transaction<'_> {
   /// released before the next mutable operation.
   ///
   /// # Errors
-  /// Malformed responses, EOF, timeout, or unsupported inquiries invalidate the
+  /// Malformed responses, EOF, timeout, or forgotten inquiries invalidate the
   /// session. Cancelling a pending read marks I/O uncertain even if this guard
   /// remains alive; its next operation fails without further I/O.
   ///
   /// # Panics
   /// Requires a Tokio runtime with time enabled.
   pub async fn next(&mut self) -> Result<Option<Event<'_>>, ClientError> {
-    self.core.check()?;
-    if !matches!(self.completion, Completion::Pending) {
-      return Ok(None);
-    }
-    let received = loop {
-      let received = self.core.read().await?;
-      if received.kind != LineKind::Empty {
-        break received;
-      }
-    };
-    if matches!(received.kind, LineKind::Ok | LineKind::Err) {
-      self.completion = received.code.map_or(Completion::Success, Completion::Remote);
-    }
-    let line = self.core.channel.received_line().ok_or(ClientError::Incomplete)?;
-    let payload = payload(&line[received.payload], self.core.sensitivity);
-    let event = match received.kind {
-      LineKind::Data => Event::Data(payload),
-      LineKind::Comment => Event::Comment(payload),
-      LineKind::End => Event::End,
-      LineKind::Status => Event::Status {
-        keyword: std::str::from_utf8(&line[received.keyword])
-          .map_err(|_| return ClientError::Incomplete)?,
-        args: payload,
-      },
-      LineKind::Ok | LineKind::Err => Event::Finished {
-        code: received.code,
-        text: payload,
-      },
-      LineKind::Empty | LineKind::Inquire => return Err(ClientError::Incomplete),
-    };
-    return Ok(Some(event));
+    return next_event(self.core, &mut self.completion).await;
   }
 
   /// Consumes an already completed transaction, without draining or other I/O.
@@ -137,9 +110,53 @@ impl Drop for Transaction<'_> {
   }
 }
 
-fn payload(bytes: &[u8], sensitivity: Sensitivity) -> PayloadRef<'_> {
+pub(crate) fn payload(bytes: &[u8], sensitivity: Sensitivity) -> PayloadRef<'_> {
   return match sensitivity {
     Sensitivity::Public => PayloadRef::Public(bytes),
     Sensitivity::Secret => PayloadRef::Secret(SecretRef::new(bytes)),
   };
+}
+
+pub(crate) async fn next_event<'a>(
+  core: &'a mut SessionCore,
+  completion: &mut Completion,
+) -> Result<Option<Event<'a>>, ClientError> {
+  core.check()?;
+  if core.machine.state() == ClientState::Inquiry {
+    core.invalidate();
+    return Err(assuan_protocol::StateError::NotReady.into());
+  }
+  if !matches!(*completion, Completion::Pending) {
+    return Ok(None);
+  }
+  let received = loop {
+    let received = core.read().await?;
+    if received.kind != LineKind::Empty {
+      break received;
+    }
+  };
+  if matches!(received.kind, LineKind::Ok | LineKind::Err) {
+    *completion = received.code.map_or(Completion::Success, Completion::Remote);
+  }
+  if received.kind == LineKind::Inquire {
+    return Ok(Some(Event::Inquire(crate::Inquiry::new(core, &received)?)));
+  }
+  let line = core.channel.received_line().ok_or(ClientError::Incomplete)?;
+  let payload = payload(&line[received.payload], core.sensitivity);
+  let event = match received.kind {
+    LineKind::Data => Event::Data(payload),
+    LineKind::Comment => Event::Comment(payload),
+    LineKind::End => Event::End,
+    LineKind::Status => Event::Status {
+      keyword: std::str::from_utf8(&line[received.keyword])
+        .map_err(|_| return ClientError::Incomplete)?,
+      args: payload,
+    },
+    LineKind::Ok | LineKind::Err => Event::Finished {
+      code: received.code,
+      text: payload,
+    },
+    LineKind::Empty | LineKind::Inquire => return Err(ClientError::Incomplete),
+  };
+  return Ok(Some(event));
 }

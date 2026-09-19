@@ -168,20 +168,24 @@ async fn events_borrow_decoded_data_and_preserve_other_wire_fields() {
     panic!()
   };
   assert_eq!(bytes, b"a\0\r\n\xff");
-  let status = tx.next().await.unwrap().unwrap();
-  assert!(!format!("{status:?}").contains("TEST"));
-  let Event::Status {
-    keyword,
-    args: PayloadRef::Public(args),
-  } = status
-  else {
-    panic!()
-  };
-  assert_eq!(keyword, "TEST");
-  assert_eq!(args, b"a%20b");
-  let comment = tx.next().await.unwrap().unwrap();
-  assert!(!format!("{comment:?}").contains("private"));
-  assert!(matches!(comment, Event::Comment(PayloadRef::Public(b" private-comment"))));
+  {
+    let status = tx.next().await.unwrap().unwrap();
+    assert!(!format!("{status:?}").contains("TEST"));
+    let Event::Status {
+      keyword,
+      args: PayloadRef::Public(args),
+    } = status
+    else {
+      panic!()
+    };
+    assert_eq!(keyword, "TEST");
+    assert_eq!(args, b"a%20b");
+  }
+  {
+    let comment = tx.next().await.unwrap().unwrap();
+    assert!(!format!("{comment:?}").contains("private"));
+    assert!(matches!(comment, Event::Comment(PayloadRef::Public(b" private-comment"))));
+  }
   assert!(matches!(tx.next().await.unwrap(), Some(Event::End)));
   assert!(matches!(
     tx.next().await.unwrap(),
@@ -191,23 +195,4 @@ async fn events_borrow_decoded_data_and_preserve_other_wire_fields() {
     })
   ));
   tx.finish().unwrap();
-}
-
-#[tokio::test]
-async fn inquiries_fail_closed_until_interactive_support_is_available() {
-  let (io, mut peer) = tokio::io::duplex(128);
-  peer.write_all(b"INQUIRE SECRET private\n").await.unwrap();
-  assert!(matches!(
-    Client::from_stream(Stream::new(io), ClientOptions::default()).await,
-    Err(ClientError::UnsupportedInquiry)
-  ));
-  assert_eq!(peer.read(&mut [0]).await.unwrap(), 0);
-  let (mut client, mut peer) = ready().await;
-  let mut tx = client.command(Command::new("NOP", b"").unwrap()).await.unwrap();
-  assert_command(&mut peer).await;
-  peer.write_all(b"INQUIRE SECRET private\n").await.unwrap();
-  assert!(matches!(tx.next().await, Err(ClientError::UnsupportedInquiry)));
-  drop(tx);
-  assert!(!client.is_usable());
-  assert_eq!(peer.read(&mut [0]).await.unwrap(), 0);
 }

@@ -35,7 +35,7 @@ pub enum ClientError {
   /// Finish was requested before receiving a final OK or ERR.
   #[error("transaction is incomplete")]
   Incomplete,
-  /// Interactive inquiry support is not available in this implementation stage.
-  #[error("interactive inquiry is not supported")]
-  UnsupportedInquiry,
+  /// Protected allocation or a configured resource limit failed.
+  #[error("client resource limit exceeded")]
+  Limit(#[from] assuan_protocol::LimitError),
 }

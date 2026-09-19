@@ -14,6 +14,8 @@ pub(crate) struct SessionCore {
   pub io_uncertain: bool,
   pub deadline: Instant,
   pub sensitivity: Sensitivity,
+  pub inquiry_timeout: std::time::Duration,
+  pub max_inquiry_bytes: usize,
 }
 
 pub(crate) struct IoGuard<'a>(&'a mut bool);
@@ -79,9 +81,18 @@ impl SessionCore {
   }
 
   pub async fn write(&mut self, bytes: &[u8]) -> Result<(), ClientError> {
+    return self.write_at(bytes, self.deadline, self.sensitivity).await;
+  }
+
+  pub async fn write_at(
+    &mut self,
+    bytes: &[u8],
+    deadline: Instant,
+    sensitivity: Sensitivity,
+  ) -> Result<(), ClientError> {
     self.check()?;
     let guard = IoGuard::begin(&mut self.io_uncertain);
-    let result = self.channel.write_line(bytes, self.deadline, self.sensitivity).await;
+    let result = self.channel.write_line(bytes, deadline, sensitivity).await;
     match result {
       Ok(()) => guard.complete(),
       Err(error) => {
@@ -113,11 +124,6 @@ fn classify(line: &mut [u8], machine: &mut ClientMachine) -> Result<Received, Cl
     } => {
       received.code = Some(code);
       received.payload = line.len() - text.len()..line.len();
-      if machine.state() == ClientState::Greeting {
-        return Err(ClientError::GreetingRejected {
-          code,
-        });
-      }
     }
     ServerLine::Status {
       keyword,
@@ -127,14 +133,25 @@ fn classify(line: &mut [u8], machine: &mut ClientMachine) -> Result<Received, Cl
       received.payload = line.len() - args.len()..line.len();
     }
     ServerLine::Inquire {
-      ..
-    } => return Err(ClientError::UnsupportedInquiry),
+      keyword,
+      args,
+    } => {
+      received.keyword = 8..8 + keyword.len();
+      received.payload = line.len() - args.len()..line.len();
+    }
     ServerLine::End | ServerLine::Empty => {}
   }
   if kind == LineKind::Data {
     let decoded = decode_data_in_place(&mut line[received.payload.clone()])?;
     received.payload.end = received.payload.start + decoded;
   }
-  machine.receive(kind)?;
+  if let Err(error) = machine.receive(kind) {
+    if error == StateError::GreetingRejected {
+      return Err(ClientError::GreetingRejected {
+        code: received.code.unwrap_or_default(),
+      });
+    }
+    return Err(error.into());
+  }
   return Ok(received);
 }

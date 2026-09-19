@@ -104,6 +104,11 @@ wiped by the client. Explicit secret classification and interactive inquiries ar
 not yet implemented. Receiving an inquiry currently closes the connection with
 `UnsupportedInquiry`.
 
+## Inquiries and greeting handshakes
+
+Use `Client::handshake` when the peer may issue an inquiry before its greeting. `Inquiry` is exclusive: data is sent as escaped `D` lines, `finish` sends `END`, and `cancel` sends `CAN` while the enclosing operation still consumes its final response. A forgotten inquiry invalidates the session. `send_secret` accepts an explicit `SecretRef`, uses protected scratch storage, and counts decoded bytes against `ClientOptions::max_inquiry_bytes`.
+
+`Client::from_stream` and `Client::connect` cancel an inquiry automatically when no callback is supplied, then wait for the peer's final response. For callbacks, implement `GreetingHandler` and use `Client::connect_with`. Callback failure, inquiry timeout, partial writes, and cancellation close the connection. Inquiry timeouts are bounded by both `inquiry_timeout` and the enclosing greeting or command deadline.
 ## License
 
 MIT. See `LICENSE.md` in this package.

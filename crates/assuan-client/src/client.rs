@@ -42,7 +42,7 @@ impl Client {
   /// Owns a standard or custom stream and waits for a successful greeting.
   ///
   /// Comments, empty lines, and status lines do not finish the greeting. An
-  /// interactive inquiry currently fails closed; inquiry support is a later stage.
+  /// greeting inquiry is cancelled with CAN; its final response is still required.
   ///
   /// # Errors
   /// Returns typed timeout, I/O, greeting rejection, and malformed response errors.
@@ -51,23 +51,63 @@ impl Client {
   /// # Panics
   /// Requires a Tokio runtime with time enabled.
   pub async fn from_stream(stream: Stream, options: ClientOptions) -> Result<Self, ClientError> {
-    options.validate()?;
-    let mut core = SessionCore {
+    return Self::handshake(stream, options).drive(None).await;
+  }
+
+  /// Starts an interactive greeting without performing I/O.
+  ///
+  /// The greeting deadline starts now. Invalid options are reported by the
+  /// first next or finish call; they do not cause a panic or perform I/O.
+  /// Dropping the returned handshake closes the owned stream.
+  pub fn handshake(stream: Stream, options: ClientOptions) -> crate::Handshake {
+    let validated = options.validate().and_then(|()| return deadline(options.greeting_timeout));
+    let (deadline, error) = match validated {
+      Ok(deadline) => (deadline, None),
+      Err(error) => (tokio::time::Instant::now(), Some(error)),
+    };
+    let core = SessionCore {
       channel: Channel::new(stream),
       machine: ClientMachine::new(),
       io_uncertain: false,
-      deadline: deadline(options.greeting_timeout)?,
+      deadline,
       sensitivity: Sensitivity::Public,
+      inquiry_timeout: options.inquiry_timeout,
+      max_inquiry_bytes: options.max_inquiry_bytes,
     };
-    while core.machine.state() != ClientState::Ready {
-      core.read().await?;
-    }
-    return Ok(Self {
-      core,
-      options,
-    });
+    return crate::Handshake {
+      client: Some(Self {
+        core,
+        options,
+      }),
+      completion: crate::transaction::Completion::Pending,
+      error,
+    };
   }
 
+  /// Connects and delegates greeting inquiries to a caller-provided handler.
+  ///
+  /// # Errors
+  /// Returns option, connection, greeting, callback, or timeout errors. Callback
+  /// failure or cancellation closes the owned connection. Each inquiry must be
+  /// finished or cancelled; returning successfully without doing so is an error.
+  ///
+  /// # Panics
+  /// Requires a Tokio runtime with I/O and time enabled.
+  pub async fn connect_with(
+    endpoint: &Endpoint,
+    options: ClientOptions,
+    handler: &mut dyn crate::GreetingHandler,
+  ) -> Result<Self, ClientError> {
+    options.validate()?;
+    let stream = assuan_transport::connect(
+      endpoint,
+      &ConnectOptions {
+        timeout: options.connect_timeout,
+      },
+    )
+    .await?;
+    return Self::handshake(stream, options).drive(Some(handler)).await;
+  }
   /// Validates and sends a command, borrowing this session until completion.
   ///
   /// Arguments are already in wire representation. Encoding uses fixed protected
@@ -83,6 +123,24 @@ impl Client {
   /// # Panics
   /// Requires a Tokio runtime with time enabled.
   pub async fn command(&mut self, command: Command<'_>) -> Result<Transaction<'_>, ClientError> {
+    return self.command_with(command, Sensitivity::Public).await;
+  }
+
+  /// Sends a command with explicit classification of all received payloads.
+  ///
+  /// Secret responses expose `SecretRef` instead of an unclassified byte slice.
+  /// The classification is chosen before any command bytes are sent.
+  ///
+  /// # Errors
+  /// Has the same validation, deadline, and cancellation behavior as command.
+  ///
+  /// # Panics
+  /// Requires a Tokio runtime with time enabled.
+  pub async fn command_with(
+    &mut self,
+    command: Command<'_>,
+    sensitivity: Sensitivity,
+  ) -> Result<Transaction<'_>, ClientError> {
     self.core.check()?;
     if self.core.machine.state() != ClientState::Ready {
       self.core.invalidate();
@@ -96,6 +154,7 @@ impl Client {
     while self.core.channel.has_buffered_input() {
       self.core.read().await?;
     }
+    self.core.sensitivity = sensitivity;
     self.core.machine.begin_command()?;
     self.core.write(&encoded[..len]).await?;
     return Ok(Transaction {

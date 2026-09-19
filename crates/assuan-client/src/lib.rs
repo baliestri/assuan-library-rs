@@ -11,3 +11,8 @@ pub use client::Client;
 pub use error::ClientError;
 pub use options::ClientOptions;
 pub use transaction::{Event, Transaction};
+
+mod handshake;
+mod inquiry;
+pub use handshake::{ClientFuture, GreetingHandler, Handshake};
+pub use inquiry::Inquiry;
