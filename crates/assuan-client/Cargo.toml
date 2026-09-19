@@ -1,0 +1,26 @@
+[package]
+name = "assuan-client"
+description = "Borrowed asynchronous Assuan client transactions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+assuan-protocol = { version = "0.1.0", path = "../assuan-protocol" }
+assuan-transport = { version = "0.1.0", path = "../assuan-transport" }
+tokio = { workspace = true, features = ["time"] }
+zeroize.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "io-util", "test-util"] }
+
+[lints]
+workspace = true

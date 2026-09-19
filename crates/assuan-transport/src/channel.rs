@@ -34,6 +34,24 @@ impl Channel {
     };
   }
 
+  /// Reports whether bytes for a subsequent line are already buffered.
+  ///
+  /// Does not poll the stream or classify those bytes. A session owner can use
+  /// this to reject unsolicited read-ahead before beginning another operation.
+  #[must_use]
+  pub fn has_buffered_input(&self) -> bool {
+    return self.pending != 0;
+  }
+
+  /// Borrows the last complete line, including any in-place modifications.
+  ///
+  /// Returns None before completion or after a read starts, an error, or close.
+  /// The borrow prevents mutable channel operations while the slice is live.
+  #[must_use]
+  pub fn received_line(&self) -> Option<&[u8]> {
+    return self.line.line();
+  }
+
   /// Reads one LF-terminated line, removing LF and an optional preceding CR.
   ///
   /// The returned slice borrows separate line storage and permits in-place
