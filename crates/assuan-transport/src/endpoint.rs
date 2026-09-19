@@ -9,6 +9,9 @@ pub enum Endpoint {
   /// TCP does not authenticate a local OS user. Bind loopback when remote
   /// exposure is unnecessary; application authentication is a separate layer.
   Tcp(SocketAddr),
+  /// A filesystem Unix socket. Listeners require a private, user-owned parent directory.
+  #[cfg(unix)]
+  Unix(std::path::PathBuf),
 }
 
 /// Options for a complete transport connection attempt.

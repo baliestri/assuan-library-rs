@@ -20,13 +20,19 @@ pub async fn connect(
   endpoint: &Endpoint,
   options: &ConnectOptions,
 ) -> Result<Stream, TransportError> {
-  let Endpoint::Tcp(address) = endpoint;
-  if address.port() == 0 || address.ip().is_unspecified() {
-    return Err(TransportError::InvalidEndpoint);
-  }
   return within_deadline(options, async {
-    let stream = tokio::net::TcpStream::connect(address).await?;
-    return Ok(Stream::new(stream));
+    match endpoint {
+      Endpoint::Tcp(address) => {
+        if address.port() == 0 || address.ip().is_unspecified() {
+          return Err(TransportError::InvalidEndpoint);
+        }
+        return Ok(Stream::new(tokio::net::TcpStream::connect(address).await?));
+      }
+      #[cfg(unix)]
+      Endpoint::Unix(path) => {
+        return Ok(Stream::new(tokio::net::UnixStream::connect(path).await?));
+      }
+    }
   })
   .await;
 }

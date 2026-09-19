@@ -1,7 +1,7 @@
 # assuan-transport
 
 Extensible asynchronous byte streams and TCP listeners/connectors for Assuan.
-This crate currently implements TCP and custom streams. Unix sockets, Windows
+This crate currently implements TCP, Unix sockets, and custom streams. Windows
 named pipes, endpoint discovery, and shared protocol framing are planned.
 
 ## TCP
@@ -33,6 +33,29 @@ TCP supplies no OS-authenticated user identity, including on loopback. The local
 access policy in `ListenOptions` applies to local IPC backends, not TCP. Choose
 the bind address explicitly and provide any application authentication at the
 session layer. This crate does not add TLS or interpret Assuan responses.
+
+## Unix sockets
+
+On Unix, `Endpoint::Unix(path)` connects to a filesystem socket. Binding requires
+an existing directory owned by the effective user, with no group or other
+permissions (normally mode 0700). A symlink as the immediate parent or endpoint
+is rejected, and existing files or sockets are never replaced. The socket is
+created inside that private directory, then restricted to mode 0600, without
+changing the process-wide umask. The bound endpoint records an absolute path.
+
+Before returning an accepted stream, the listener checks the peer's OS-reported
+UID against the effective UID captured at bind time. `Accepted::peer` includes
+the Unix UID, GID, and PID when supplied by the platform. Connection attempts do
+not require a private parent: callers may connect to external services such as
+gpg-agent using their existing endpoint layout.
+
+Call `Listener::cleanup` explicitly to remove an owned socket and close the
+listener. It rechecks the parent's owner, permissions, device and inode, and the
+socket's owner, type, device and inode. Detected replacements are preserved;
+repeated successful cleanup is harmless. Drop closes the listener without
+unlinking any pathname. Other processes running as the same user, and privileged
+processes, must be trusted: pathname checks cannot prevent their concurrent
+mutations. This policy isolates different unprivileged OS users.
 
 ## Custom transports
 
