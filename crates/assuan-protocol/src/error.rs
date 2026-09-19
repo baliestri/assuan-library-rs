@@ -38,6 +38,10 @@ pub enum ProtocolError {
   InvalidErrorCode,
   /// A percent escape is incomplete or contains a nonhexadecimal digit.
   InvalidEscape,
+  /// A line cannot fit within the wire limit including its terminator.
+  LineTooLong,
+  /// EOF arrived before the current line was terminated.
+  UnexpectedEof,
 }
 
 impl fmt::Display for ProtocolError {
@@ -48,6 +52,8 @@ impl fmt::Display for ProtocolError {
       Self::InvalidResponse => "invalid server response",
       Self::InvalidErrorCode => "invalid remote error code",
       Self::InvalidEscape => "invalid percent escape",
+      Self::LineTooLong => "protocol line exceeds wire limit",
+      Self::UnexpectedEof => "incomplete protocol line at EOF",
     });
   }
 }

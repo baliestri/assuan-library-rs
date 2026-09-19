@@ -2,8 +2,8 @@
 
 Runtime-independent building blocks for Assuan. This crate currently provides
 fixed-capacity secret storage, borrowed command and response parsing, and
-in-place percent decoding. Framing, encoding, and session state machines are
-being implemented.
+in-place percent decoding, incremental framing, and bounded encoding. Session
+state machines are being implemented.
 
 Disable default features for `no_std` with `alloc`. This crate requires a heap
 allocator, but has no I/O or asynchronous runtime dependency.
@@ -64,6 +64,35 @@ never include input contents.
 The wire grammar follows the Assuan manual's
 [client requests](https://www.gnupg.org/documentation/manuals/assuan/Client-requests.html)
 and [server responses](https://www.gnupg.org/documentation/manuals/assuan/Server-responses.html).
+
+## Framing and encoding
+
+`LineBuffer` consumes through one LF at a time. Use the consumed count to retain
+any following bytes for the next line. Both LF and CRLF count toward the
+1,000-byte wire limit. A complete line remains borrowed until `clear`; EOF with
+an unfinished line is an error. Clear, framing failure, and normal drop wipe
+its fixed storage. Moving stack storage may leave copies, so transports must
+also protect their read-ahead and scratch buffers.
+
+```rust
+use assuan_protocol::{LineBuffer, MAX_LINE_BYTES, encode_data_chunk};
+
+let mut output = [0; MAX_LINE_BYTES];
+let (consumed, written) = encode_data_chunk(b"first\nsecond", &mut output)?;
+assert_eq!(consumed, 12);
+let mut frame = LineBuffer::new();
+assert_eq!(frame.feed(&output[..written])?, written);
+assert_eq!(frame.line(), Some(b"D first%0Asecond".as_slice()));
+frame.clear();
+# Ok::<(), assuan_protocol::ProtocolError>(())
+```
+
+`encode_command` and `encode_response` validate the complete line before writing;
+errors preserve the output. `encode_data_chunk` takes raw bytes and emits as much
+as fits, without splitting an escape. Repeat with the unconsumed suffix for
+larger payloads. `ServerLine::Data`, in contrast, holds wire-format bytes and
+is not escaped again. Output buffers belong to the caller and require cleanup
+when carrying sensitive data.
 
 ## License
 
