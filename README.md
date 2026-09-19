@@ -4,7 +4,7 @@ A Rust library planned for the [Assuan protocol](https://gnupg.org/documentation
 
 ## Project status
 
-The workspace currently provides bounded canonical S-expression parsing and encoding in `assuan-sexpr`, and fixed-capacity secret storage in `assuan-protocol`. The remaining crates and asynchronous protocol integration are under development. No package has been published.
+The workspace currently provides bounded canonical S-expression parsing and encoding in `assuan-sexpr`, and protected buffers, wire parsing, framing, encoding, and pure session state machines in `assuan-protocol`. The remaining crates and asynchronous protocol integration are under development. No package has been published.
 
 ## Workspace design
 

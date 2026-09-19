@@ -2,8 +2,8 @@
 
 Runtime-independent building blocks for Assuan. This crate currently provides
 fixed-capacity secret storage, borrowed command and response parsing, and
-in-place percent decoding, incremental framing, and bounded encoding. Session
-state machines are being implemented.
+in-place percent decoding, incremental framing, bounded encoding, and pure
+client and server session state machines.
 
 Disable default features for `no_std` with `alloc`. This crate requires a heap
 allocator, but has no I/O or asynchronous runtime dependency.
@@ -93,6 +93,37 @@ as fits, without splitting an escape. Repeat with the unconsumed suffix for
 larger payloads. `ServerLine::Data`, in contrast, holds wire-format bytes and
 is not escaped again. Output buffers belong to the caller and require cleanup
 when carrying sensitive data.
+
+## Session state machines
+
+`ClientMachine` and `ServerMachine` validate protocol sequencing without I/O or
+allocation. Both begin in Greeting. Comments, status, and inquiries may precede
+the initial OK. An inquiry remembers whether to resume the greeting or a command.
+
+```rust
+use assuan_protocol::{ClientMachine, ClientState, LineKind};
+
+let mut client = ClientMachine::new();
+client.receive(LineKind::Ok)?;
+client.begin_command()?;
+client.receive(LineKind::Inquire)?;
+client.finish_inquiry(true)?; // CAN was successfully sent.
+assert_eq!(client.state(), ClientState::AwaitFinal);
+client.receive(LineKind::Err)?;
+assert_eq!(client.state(), ClientState::Ready);
+# Ok::<(), assuan_protocol::StateError>(())
+```
+
+A command's ERR permits reuse; a greeting's ERR invalidates the connection.
+CAN requires a final response and must not be confused with the reserved
+application command CANCEL. Partial server END does not finish a command.
+Unexpected protocol events invalidate the machine. Local client operations
+requested in the wrong phase fail without discarding an otherwise valid session.
+
+The integration layer must validate wire syntax before classifying events and
+invalidate after failed, partial, or cancelled I/O. Server response transitions
+are checked before sending; a failed send must invalidate even if the transition
+reached Ready. These machines do not close transports or implement timeout logic.
 
 ## License
 

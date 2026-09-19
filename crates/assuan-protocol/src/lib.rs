@@ -20,3 +20,7 @@ pub use secret::{PayloadRef, SecretBytes, SecretRef, Sensitivity};
 
 pub use encode::{encode_command, encode_data_chunk, encode_response};
 pub use frame::{LineBuffer, MAX_LINE_BYTES};
+mod state;
+pub use state::{
+  ClientMachine, ClientState, LineKind, RequestKind, ServerMachine, ServerState, StateError,
+};
