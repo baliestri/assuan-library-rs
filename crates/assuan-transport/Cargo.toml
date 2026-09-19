@@ -1,0 +1,23 @@
+[package]
+name = "assuan-transport"
+description = "Extensible asynchronous streams and TCP transport for Assuan"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+tokio = { workspace = true, features = ["net", "io-util", "time", "rt"] }
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "test-util"] }
+
+[lints]
+workspace = true
