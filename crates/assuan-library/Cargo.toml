@@ -28,7 +28,8 @@ assuan-macros = { path = "../assuan-macros", version = "0.1.0", optional = true 
 assuan-sexpr = { path = "../assuan-sexpr", version = "0.1.0", optional = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt", "net", "io-util", "sync", "signal", "time"] }
+tokio = { workspace = true, features = ["macros", "rt", "net", "io-util", "sync", "signal", "time", "process"] }
+tempfile = "3"
 trybuild.workspace = true
 
 [[test]]
@@ -41,6 +42,14 @@ workspace = true
 [[test]]
 name = "handlers"
 required-features = ["client", "server", "macros"]
+
+[[test]]
+name = "interop_agent"
+required-features = ["client"]
+
+[[test]]
+name = "interop_server"
+required-features = ["client", "server"]
 
 [[example]]
 name = "tcp_client"

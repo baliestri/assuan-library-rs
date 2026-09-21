@@ -1,0 +1,61 @@
+name: GnuPG interoperability
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  interop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      ASSUAN_GNUPG_REQUIRED: "1"
+      CARGO_TARGET_DIR: ${{ runner.temp }}/assuan-target
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        shell: bash
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - name: Install GnuPG on Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg
+          echo "ASSUAN_GPGCONF=$(command -v gpgconf)" >> "$GITHUB_ENV"
+          echo "ASSUAN_GPG_CONNECT_AGENT=$(command -v gpg-connect-agent)" >> "$GITHUB_ENV"
+      - name: Install GnuPG on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install gnupg
+          echo "ASSUAN_GPGCONF=$(brew --prefix gnupg)/bin/gpgconf" >> "$GITHUB_ENV"
+          echo "ASSUAN_GPG_CONNECT_AGENT=$(brew --prefix gnupg)/bin/gpg-connect-agent" >> "$GITHUB_ENV"
+      - name: Install GnuPG on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install gpg4win --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Gpg4win installation failed' }
+          $candidates = @("${env:ProgramFiles(x86)}\GnuPG\bin", "$env:ProgramFiles\GnuPG\bin")
+          $bin = $candidates | Where-Object { Test-Path -LiteralPath (Join-Path $_ 'gpgconf.exe') } | Select-Object -First 1
+          if (-not $bin) { throw 'Native GnuPG executables were not found' }
+          "ASSUAN_GPGCONF=$(Join-Path $bin 'gpgconf.exe')" >> $env:GITHUB_ENV
+          "ASSUAN_GPG_CONNECT_AGENT=$(Join-Path $bin 'gpg-connect-agent.exe')" >> $env:GITHUB_ENV
+      - name: Test independent peers and isolated agent
+        if: runner.os != 'Windows'
+        run: cargo test -p assuan-library --test interop_agent --test interop_server -- --nocapture
+      - name: Test with short Windows tool paths
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/test-interop.ps1
