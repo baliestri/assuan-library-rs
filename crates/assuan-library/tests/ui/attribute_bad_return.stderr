@@ -1,0 +1,5 @@
+error: expected Result
+ --> tests/ui/attribute_bad_return.rs:5:6
+  |
+5 | ) -> bool {
+  |      ^^^^

@@ -1,0 +1,5 @@
+error: built-in command names are reserved
+ --> tests/ui/attribute_reserved.rs:1:34
+  |
+1 | #[assuan_library::assuan_command("NOP", "Cannot replace a built-in")]
+  |                                  ^^^^^

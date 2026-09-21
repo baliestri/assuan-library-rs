@@ -1,0 +1,5 @@
+error: description must not contain NUL, CR or LF
+ --> tests/ui/attribute_description.rs:1:45
+  |
+1 | #[assuan_library::assuan_command("INVALID", "line\nbreak")]
+  |                                             ^^^^^^^^^^^^^

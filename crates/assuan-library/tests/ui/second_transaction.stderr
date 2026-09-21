@@ -1,0 +1,10 @@
+error[E0499]: cannot borrow `*client` as mutable more than once at a time
+ --> tests/ui/second_transaction.rs:5:17
+  |
+4 |   let mut transaction = client.command(Command::new("NOP", b"").unwrap()).await.unwrap();
+  |                         ------ first mutable borrow occurs here
+5 |   let _second = client.command(Command::new("NOP", b"").unwrap()).await.unwrap();
+  |                 ^^^^^^ second mutable borrow occurs here
+6 |   let _event = transaction.next().await.unwrap();
+7 | }
+  | - first borrow might be used here, when `transaction` is dropped and runs the `Drop` code for type `Transaction`

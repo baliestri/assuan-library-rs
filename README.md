@@ -1,10 +1,10 @@
 # assuan-library-rs
 
-A Rust library planned for the [Assuan protocol](https://gnupg.org/documentation/manuals/assuan/), supporting custom clients and servers and interoperability with GnuPG/gpg-agent.
+A Rust implementation of the [Assuan protocol](https://gnupg.org/documentation/manuals/assuan/) with asynchronous clients, servers and extensible transports.
 
 ## Project status
 
-The workspace currently provides bounded canonical S-expression parsing and encoding in `assuan-sexpr`, and protected buffers, wire parsing, framing, encoding, and pure session state machines in `assuan-protocol`, plus TCP, Unix sockets, Windows named pipes, custom asynchronous streams, native agent discovery, and bounded asynchronous line framing in `assuan-transport`. `assuan-client` adds greeting handling and exclusive streaming transactions over standard or custom streams. Interactive inquiries and the remaining crates are under development. No package has been published.
+All seven crates are implemented. The facade exposes borrowed protocol types, protected buffers, streaming client transactions and inquiries, typed server handlers and hooks, bounded concurrent serving, canonical S-expressions, and compile-validated macros. TCP, Unix sockets, Windows named pipes and application-defined byte transports are supported on their respective platforms. Native agent discovery does not launch services. Independent interoperability tests with real GnuPG are the next development stage; no package has been published.
 
 ## Workspace design
 
@@ -29,7 +29,45 @@ The workspace currently provides bounded canonical S-expression parsing and enco
 
 ## Toolchain
 
-The workspace is configured for Rust 1.98.1 and edition 2024. Formatting and linting use rustfmt and Clippy. Run `cargo test --workspace --features assuan-transport/test-fixtures` to check the implemented crates and their documentation examples.
+The workspace uses Rust 1.98.1 and edition 2024. Formatting requires nightly
+to apply every option in rustfmt.toml:
+
+```text
+cargo check --workspace --all-targets
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo +nightly fmt --all -- --check
+```
+
+## Getting started
+
+Use a path dependency on `crates/assuan-library` until publication. The facade
+enables `client`, `server`, `macros` and `sexpr` by default; each can be
+selected independently with default features disabled. Protocol and transport
+remain available. Macros do not implicitly enable client or server.
+
+See [the facade guide](crates/assuan-library/README.md) for handler syntax,
+feature selection and ownership contracts. Direct crate dependencies remain
+supported. Macro and ordinary handlers can share a session's concrete state.
+
+```text
+cargo run -p assuan-library --example custom_transport
+cargo run -p assuan-library --example tcp_server -- 9000
+cargo run -p assuan-library --example tcp_client -- 9000
+```
+
+The custom example is self-contained. Run the TCP server and client in
+separate terminals; both explicitly use loopback. The agent discovery example
+requires an existing agent and accepts a gpgconf path and optional homedir.
+
+Compilation tests cover invalid macros, exclusive transaction/event borrows,
+non-cloneable secrets and Send requirements. The renamed-consumer fixture
+checks Cargo aliases:
+
+```text
+cargo test -p assuan-library --all-features
+cargo check --manifest-path crates/assuan-library/tests/fixtures/renamed/Cargo.toml
+```
 
 ## License
 

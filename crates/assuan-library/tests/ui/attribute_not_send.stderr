@@ -1,0 +1,16 @@
+error: future cannot be sent between threads safely
+ --> tests/ui/attribute_not_send.rs:1:1
+  |
+1 | #[assuan_library::assuan_command("INVALID", "Future must be Send")]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ future created by async block is not `Send`
+  |
+  = help: within `{async block@$DIR/tests/ui/attribute_not_send.rs:1:1: 1:68}`, the trait `Send` is not implemented for `Rc<i32>`
+note: future is not `Send` as this value is used across an await
+ --> tests/ui/attribute_not_send.rs:7:28
+  |
+6 |   let value = std::rc::Rc::new(1);
+  |       ----- has type `Rc<i32>` which is not `Send`
+7 |   tokio::task::yield_now().await;
+  |                            ^^^^^ await occurs here, with `value` maybe used later
+  = note: required for the cast from `Pin<Box<{async block@$DIR/tests/ui/attribute_not_send.rs:1:1: 1:68}>>` to `Pin<Box<dyn Future<Output = Result<(), HandlerError>> + Send>>`
+  = note: this error originates in the attribute macro `assuan_library::assuan_command` (in Nightly builds, run with -Z macro-backtrace for more info)

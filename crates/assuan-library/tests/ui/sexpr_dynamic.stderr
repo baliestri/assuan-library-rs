@@ -1,0 +1,5 @@
+error: expected a string, byte string, or parenthesized list
+ --> tests/ui/sexpr_dynamic.rs:2:41
+  |
+2 |   let _ = assuan_library::sexpr!(("key" concat!("a", "b")));
+  |                                         ^^^^^^

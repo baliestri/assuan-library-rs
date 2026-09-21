@@ -1,0 +1,5 @@
+error: invalid byte in protocol line
+ --> tests/ui/command_newline.rs:2:36
+  |
+2 |   let _ = assuan_library::command!("GETINFO\nversion");
+  |                                    ^^^^^^^^^^^^^^^^^^

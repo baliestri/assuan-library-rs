@@ -1,0 +1,59 @@
+[package]
+name = "assuan-library"
+description = "Asynchronous Assuan clients, servers, transports and validated protocol literals"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[features]
+default = ["client", "server", "macros", "sexpr"]
+client = ["dep:assuan-client"]
+server = ["dep:assuan-server"]
+macros = ["dep:assuan-macros"]
+sexpr = ["dep:assuan-sexpr"]
+
+[dependencies]
+assuan-protocol = { path = "../assuan-protocol", version = "0.1.0" }
+assuan-transport = { path = "../assuan-transport", version = "0.1.0" }
+assuan-client = { path = "../assuan-client", version = "0.1.0", optional = true }
+assuan-server = { path = "../assuan-server", version = "0.1.0", optional = true }
+assuan-macros = { path = "../assuan-macros", version = "0.1.0", optional = true }
+assuan-sexpr = { path = "../assuan-sexpr", version = "0.1.0", optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "net", "io-util", "sync", "signal", "time"] }
+trybuild.workspace = true
+
+[[test]]
+name = "compile"
+required-features = ["client", "server", "macros", "sexpr"]
+
+[lints]
+workspace = true
+
+[[test]]
+name = "handlers"
+required-features = ["client", "server", "macros"]
+
+[[example]]
+name = "tcp_client"
+required-features = ["client"]
+
+[[example]]
+name = "tcp_server"
+required-features = ["server", "macros"]
+
+[[example]]
+name = "agent_info"
+required-features = ["client"]
+
+[[example]]
+name = "custom_transport"
+required-features = ["client", "server"]

@@ -1,0 +1,10 @@
+error[E0499]: cannot borrow `transaction` as mutable more than once at a time
+ --> tests/ui/borrowed_event_escape.rs:6:15
+  |
+5 |   let event = transaction.next().await.unwrap();
+  |               ----------- first mutable borrow occurs here
+6 |   let _next = transaction.next().await.unwrap();
+  |               ^^^^^^^^^^^ second mutable borrow occurs here
+7 |   drop(event);
+8 | }
+  | - first borrow might be used here, when `event` is dropped and runs the destructor for type `Option<Event<'_>>`

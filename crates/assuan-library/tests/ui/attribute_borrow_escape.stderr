@@ -1,0 +1,8 @@
+error: lifetime may not live long enough
+  --> tests/ui/attribute_borrow_escape.rs:10:3
+   |
+ 7 |   command: assuan_library::Command<'_>,
+   |                                    -- let's call the lifetime of this reference `'1`
+...
+10 |   context.state_mut().retained = Some(command.args());
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ assignment requires that `'1` must outlive `'static`

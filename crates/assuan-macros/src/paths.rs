@@ -12,7 +12,12 @@ fn select_path(
   direct: Option<FoundCrate>,
 ) -> syn::Result<TokenStream> {
   if let Some(found) = facade {
-    let root = root_path(found)?;
+    // The facade explicitly declares this self-alias. It also works in the
+    // package's examples and doctests, whose crate root is not the library.
+    let root = match found {
+      FoundCrate::Itself => quote!(::assuan_library),
+      other @ FoundCrate::Name(_) => root_path(other)?,
+    };
     let module = match package {
       "assuan-protocol" => quote!(protocol),
       "assuan-server" => quote!(server),
@@ -65,14 +70,14 @@ mod tests {
   }
 
   #[test]
-  fn itself_resolves_to_crate_without_an_external_import() {
+  fn itself_uses_crate_for_direct_dependencies_and_the_explicit_facade_alias() {
     assert_eq!(
       super::select_path("assuan-protocol", None, Some(Itself)).unwrap().to_string(),
       "crate"
     );
     assert_eq!(
       super::select_path("assuan-protocol", Some(Itself), None).unwrap().to_string(),
-      "crate :: protocol"
+      ":: assuan_library :: protocol"
     );
   }
 

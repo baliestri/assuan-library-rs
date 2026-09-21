@@ -1,0 +1,8 @@
+error: expected a safe async function without generics, a where clause, or an extern ABI
+ --> tests/ui/attribute_bad_signature.rs:2:1
+  |
+2 | / fn invalid(
+3 | |   _: assuan_library::Command<'_>,
+4 | |   _: &mut assuan_library::CommandContext<'_>,
+5 | | ) -> Result<(), assuan_library::HandlerError> {
+  | |_____________________________________________^

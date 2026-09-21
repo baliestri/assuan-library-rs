@@ -24,9 +24,9 @@ It is not a const constructor. Wire framing still enforces line length.
 
 The generated path prefers `assuan-library::protocol` when the facade is
 present, otherwise the direct protocol dependency. Cargo dependency aliases
-are supported. Using the macro inside the defining library resolves through
-`crate`; integration targets in that same package must provide the matching
-crate-root reexports. Full facade consumer tests are planned with the facade.
+are supported. The facade declares an explicit self-alias so macros also work
+in its own library, examples and doctests. Direct defining crates resolve
+through `crate`. Consumers do not need to import private helper paths.
 
 ## S-expression literals
 
@@ -110,5 +110,5 @@ lint exception is limited to the generated adapter type.
 
 The generated implementation uses std and resolves server/protocol paths
 through the facade when present, otherwise through direct dependencies.
-Direct consumers are compiled in this crate's tests; the full facade and
-compile-fail consumer suite follows with the facade implementation.
+Direct consumers are compiled in this crate's tests; facade consumers,
+renamed dependencies and compile-fail contracts are tested by assuan-library.
