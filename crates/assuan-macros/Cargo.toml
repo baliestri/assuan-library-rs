@@ -23,5 +23,8 @@ quote.workspace = true
 syn.workspace = true
 proc-macro-crate.workspace = true
 
+[dev-dependencies]
+assuan-server = { path = "../assuan-server", version = "0.1.0" }
+
 [lints]
 workspace = true

@@ -1,10 +1,42 @@
 #![doc = include_str!("../README.md")]
 
+mod attribute;
 mod command;
 mod paths;
 mod sexpr;
 
 use proc_macro::TokenStream;
+
+/// Turns an async command function into a unit value implementing `Handler<S>`.
+///
+/// Accepts two string literals: the wire command name and public HELP text.
+/// The function must take `Command<'_>` and `&mut CommandContext<'_, S>` and
+/// return `Result<(), HandlerError>`. Omitting S means unit state. Use concrete
+/// state and elided or anonymous call lifetimes; generic functions, receivers,
+/// unsafe functions and extern ABIs are rejected. Qualified type paths work;
+/// aliases for the three signature types are not recognized.
+///
+/// The original name becomes a registrable unit value, retaining visibility
+/// and rustdoc. The body moves into a private associated helper. Each call
+/// boxes one Send future which borrows the command and context across awaits.
+/// The compiler checks concrete state bounds and the body's Send requirement.
+/// Register explicitly with `Server::register` or `Registry::register`;
+/// duplicate command names remain registration errors.
+///
+/// Requires the facade with server support or direct protocol and server
+/// dependencies; Cargo aliases are supported. The generated code uses std.
+/// See the crate documentation for supported function attributes.
+///
+/// # Errors
+/// Emits compiler errors for invalid signatures, reserved or invalid command
+/// names, unsupported attributes, and NUL/CR/LF in descriptions. Names must
+/// fit the protocol wire limit. Metadata is public and embedded in the binary.
+#[proc_macro_attribute]
+pub fn assuan_command(args: TokenStream, item: TokenStream) -> TokenStream {
+  return attribute::expand_attribute(args.into(), item.into())
+    .unwrap_or_else(|error| return error.to_compile_error())
+    .into();
+}
 
 /// Parses a string literal as a validated, borrowed Assuan command.
 ///

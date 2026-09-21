@@ -55,3 +55,60 @@ protocol constants, never for credentials or other secrets requiring erasure.
 Library-generated validation messages do not include payloads, but compiler
 diagnostics can display source lines. Invalid input produces compilation
 errors rather than application panics.
+
+## Explicit command handlers
+
+`#[assuan_command("ECHO", "Returns arguments")]` turns a safe async function
+into a unit value implementing `assuan_server::Handler<S>`. Add a direct
+`assuan-server` dependency alongside the protocol and macro crates:
+
+```rust
+use assuan_macros::assuan_command;
+use assuan_protocol::Command;
+use assuan_server::{CommandContext, HandlerError, Registry};
+
+#[assuan_command("ECHO", "Returns arguments")]
+/// Returns the original command arguments.
+pub async fn echo(
+  command: Command<'_>,
+  context: &mut CommandContext<'_>,
+) -> Result<(), HandlerError> {
+  return context.send_data(command.args()).await;
+}
+
+let mut registry = Registry::<()>::new();
+registry.register(echo)?;
+# Ok::<(), assuan_server::RegistryError>(())
+```
+
+The original name denotes a registrable adapter, not a callable function.
+Visibility and rustdoc stay on that adapter; the body becomes a private
+associated helper. The macro receives context by value and lends it to the
+helper. Command arguments can remain borrowed across awaits; each invocation
+allocates one boxed Send future. No payload copy or automatic registration is
+introduced. Final OK/ERR responses remain the session runner's responsibility.
+
+Use `&mut CommandContext<'_, MyState>` for concrete session state; omission
+means `()`. State must be Send and static, but need not be Sync. Functions
+must have exactly two arguments and return `Result<(), HandlerError>`.
+Qualified paths are accepted; aliases of `Command`, `CommandContext`, `Result` or
+`HandlerError` are not recognized syntactically. Use elided or anonymous call
+lifetimes. Generic functions, receivers, extern ABIs, unsafe functions and
+variadics are rejected. Rust checks the body's types and Send requirements.
+
+Names obey protocol validation and the wire length limit. NOP, BYE, HELP,
+RESET and OPTION are reserved, case-sensitively. Descriptions may be empty or
+Unicode but cannot contain NUL, CR or LF. Duplicate registration remains a
+runtime registry error.
+
+Supported inner attributes are rustdoc, `cfg`, `allow`/`warn`/`deny`/`forbid`,
+`deprecated`, `inline`, `cold` and `must_use`. Function-only attributes stay on the
+helper; `cfg` gates all generated items. Other transforming attributes and
+`cfg_attr` must be applied outside `assuan_command` so they run first; inner
+`expect` is rejected rather than duplicated across generated items. The naming
+lint exception is limited to the generated adapter type.
+
+The generated implementation uses std and resolves server/protocol paths
+through the facade when present, otherwise through direct dependencies.
+Direct consumers are compiled in this crate's tests; the full facade and
+compile-fail consumer suite follows with the facade implementation.
