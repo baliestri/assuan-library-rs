@@ -1,14 +1,16 @@
-use super::*;
-use crate::{HandlerFuture, Registry, handler};
-use assuan_protocol::{Command, RequestKind, ServerState};
-use assuan_transport::Stream;
 use std::{
   cell::Cell,
   future::Future,
   task::{Context, Poll, Waker},
   time::Duration,
 };
+
+use assuan_protocol::{Command, RequestKind, ServerState};
+use assuan_transport::Stream;
 use tokio::io::AsyncReadExt;
+
+use super::*;
+use crate::{HandlerFuture, Registry, handler};
 
 fn machine() -> ServerMachine {
   let mut machine = ServerMachine::new();
@@ -36,7 +38,7 @@ async fn registered_handler_borrows_arguments_across_await_and_mutates_non_sync_
   let mut state = Cell::new(0);
   let mut registry = Registry::new();
   registry.register(handler("ECHO", "Echo arguments", echo).unwrap()).unwrap();
-  let args = vec![b'a', b'%', 0xff];
+  let args = vec![b'a', b'%', 0xFF];
   let command = Command::new("ECHO", &args).unwrap();
   let context = CommandContext {
     channel: &mut channel,

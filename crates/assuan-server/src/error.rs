@@ -1,6 +1,7 @@
+use std::fmt;
+
 use assuan_protocol::{MAX_LINE_BYTES, ProtocolError, ServerLine, StateError, encode_response};
 use assuan_transport::TransportError;
-use std::fmt;
 use thiserror::Error;
 use zeroize::Zeroizing;
 
@@ -31,8 +32,9 @@ pub enum RegistryError {
 pub enum HandlerError {
   /// An application error intended for the peer.
   ///
-  /// Prefer [`Self::remote`]. Because fields are public, the session runner must
-  /// call [`Self::validate_remote`] again immediately before encoding a final.
+  /// Prefer [`Self::remote`]. Because fields are public, the session runner
+  /// must call [`Self::validate_remote`] again immediately before encoding a
+  /// final.
   #[error("remote handler error ({code})")]
   Remote {
     /// The unsigned Assuan error code, including any application source bits.

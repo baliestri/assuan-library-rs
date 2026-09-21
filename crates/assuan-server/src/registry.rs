@@ -1,10 +1,12 @@
-use crate::{CommandContext, Handler, HandlerFuture, RegistryError};
-use assuan_protocol::{Command, MAX_LINE_BYTES};
 use std::{
   collections::{HashMap, hash_map::Entry},
   fmt,
   marker::PhantomData,
 };
+
+use assuan_protocol::{Command, MAX_LINE_BYTES};
+
+use crate::{CommandContext, Handler, HandlerFuture, RegistryError};
 
 /// An explicit, case-sensitive collection of handlers for session state `S`.
 ///
@@ -36,8 +38,9 @@ impl<S: Send + 'static> Registry<S> {
   /// changes its metadata through interior mutability.
   ///
   /// # Errors
-  /// Rejects invalid or reserved names, CR/LF/NUL in descriptions, and duplicate
-  /// keys. A failed registration leaves every existing entry untouched.
+  /// Rejects invalid or reserved names, CR/LF/NUL in descriptions, and
+  /// duplicate keys. A failed registration leaves every existing entry
+  /// untouched.
   pub fn register<H: Handler<S> + 'static>(&mut self, handler: H) -> Result<(), RegistryError> {
     let name = handler.name();
     validate_name(name)?;
@@ -91,15 +94,16 @@ struct ClosureHandler<S, F> {
 }
 
 impl<S: Send + 'static, F> Handler<S> for ClosureHandler<S, F>
-where
-  F: for<'a> Fn(Command<'a>, CommandContext<'a, S>) -> HandlerFuture<'a> + Send + Sync + 'static,
+where F: for<'a> Fn(Command<'a>, CommandContext<'a, S>) -> HandlerFuture<'a> + Send + Sync + 'static
 {
   fn name(&self) -> &str {
     return self.name;
   }
+
   fn description(&self) -> &str {
     return self.description;
   }
+
   fn call<'a>(&'a self, command: Command<'a>, context: CommandContext<'a, S>) -> HandlerFuture<'a> {
     return (self.function)(command, context);
   }
@@ -119,7 +123,7 @@ where
 /// ```
 /// # fn main() -> Result<(), assuan_server::RegistryError> {
 /// use assuan_protocol::Command;
-/// use assuan_server::{handler, CommandContext, HandlerFuture, Registry};
+/// use assuan_server::{CommandContext, HandlerFuture, Registry, handler};
 ///
 /// fn echo<'a>(command: Command<'a>, mut ctx: CommandContext<'a>) -> HandlerFuture<'a> {
 ///   return Box::pin(async move {

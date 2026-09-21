@@ -1,5 +1,3 @@
-use crate::{ConnectOptions, DiscoveryError, Endpoint, Stream, TransportError};
-use assuan_protocol::{LimitError, SecretBytes};
 use std::{
   fmt,
   path::PathBuf,
@@ -7,6 +5,8 @@ use std::{
   sync::atomic::{AtomicUsize, Ordering},
   time::Duration,
 };
+
+use assuan_protocol::{LimitError, SecretBytes};
 use tokio::{
   io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
   process::Command,
@@ -14,10 +14,13 @@ use tokio::{
 };
 use zeroize::Zeroizing;
 
+use crate::{ConnectOptions, DiscoveryError, Endpoint, Stream, TransportError};
+
 const OUTPUT_LIMIT: usize = 1024 * 1024;
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Discovers the agent endpoint using an explicitly selected gpgconf executable.
+/// Discovers the agent endpoint using an explicitly selected gpgconf
+/// executable.
 ///
 /// Invokes `--list-dirs agent-socket` without a shell, optionally preceded by
 /// `--homedir`. This named form returns an unescaped pathname: percent signs
@@ -29,7 +32,8 @@ pub struct AgentLocator {
 }
 
 impl AgentLocator {
-  /// Selects the executable and optional `GnuPG` home directory without spawning it.
+  /// Selects the executable and optional `GnuPG` home directory without
+  /// spawning it.
   #[must_use]
   pub fn new(executable: PathBuf, homedir: Option<PathBuf>) -> Self {
     return Self {
@@ -47,9 +51,10 @@ impl AgentLocator {
   /// an in-progress OS file read cannot be forcibly cancelled by Tokio.
   ///
   /// # Errors
-  /// Returns typed I/O, discovery, allocation, or timeout errors. Captured output
-  /// and nonce bytes are never included in diagnostics. Windows paths must be
-  /// valid UTF-8; Unix path bytes are preserved without text conversion.
+  /// Returns typed I/O, discovery, allocation, or timeout errors. Captured
+  /// output and nonce bytes are never included in diagnostics. Windows paths
+  /// must be valid UTF-8; Unix path bytes are preserved without text
+  /// conversion.
   ///
   /// # Panics
   /// Requires a Tokio runtime with I/O and time drivers enabled.
@@ -141,11 +146,12 @@ impl ResolvedEndpoint {
 
   /// Connects and sends any native nonce under one total connection deadline.
   ///
-  /// No Assuan response is read. A failed or cancelled attempt drops its stream.
+  /// No Assuan response is read. A failed or cancelled attempt drops its
+  /// stream.
   ///
   /// # Errors
-  /// Returns connection, I/O, timeout, or invalid-option errors. Nonce bytes are
-  /// not included in error messages. Zero duration immediately times out.
+  /// Returns connection, I/O, timeout, or invalid-option errors. Nonce bytes
+  /// are not included in error messages. Zero duration immediately times out.
   ///
   /// # Panics
   /// Requires a Tokio runtime with I/O and time enabled.

@@ -15,14 +15,14 @@ use crate::{ParseError, ParseErrorKind, ParseLimits, Sexpr};
 ///
 /// # Errors
 ///
-/// Returns [`ParseError`] for invalid syntax, truncated input, integer overflow,
-/// an exceeded limit or failed reservation of list storage. The error includes
-/// its byte offset but no copy of the input.
+/// Returns [`ParseError`] for invalid syntax, truncated input, integer
+/// overflow, an exceeded limit or failed reservation of list storage. The error
+/// includes its byte offset but no copy of the input.
 ///
 /// # Examples
 ///
 /// ```
-/// use assuan_sexpr::{parse_prefix, ParseLimits, Sexpr};
+/// use assuan_sexpr::{ParseLimits, Sexpr, parse_prefix};
 ///
 /// let (value, consumed) = parse_prefix(b"1:a1:b", ParseLimits::default())?;
 /// assert_eq!(value, Sexpr::Atom(b"a"));
@@ -82,9 +82,10 @@ pub fn parse_prefix(input: &[u8], limits: ParseLimits) -> Result<(Sexpr<'_>, usi
 
 /// Parses exactly one canonical S-expression, borrowing atom payloads.
 ///
-/// This applies the same syntax and limits as [`parse_prefix`], and additionally
-/// requires that every input byte belongs to the expression. It does not trim
-/// whitespace before or after it. Only list structure is allocated.
+/// This applies the same syntax and limits as [`parse_prefix`], and
+/// additionally requires that every input byte belongs to the expression. It
+/// does not trim whitespace before or after it. Only list structure is
+/// allocated.
 ///
 /// # Errors
 ///
@@ -94,7 +95,7 @@ pub fn parse_prefix(input: &[u8], limits: ParseLimits) -> Result<(Sexpr<'_>, usi
 /// # Examples
 ///
 /// ```
-/// use assuan_sexpr::{parse_complete, ParseLimits, Sexpr};
+/// use assuan_sexpr::{ParseLimits, Sexpr, parse_complete};
 ///
 /// let value = parse_complete(b"(3:foo0:)", ParseLimits::default())?;
 /// assert_eq!(value, Sexpr::List(vec![Sexpr::Atom(b"foo"), Sexpr::Atom(b"")]));

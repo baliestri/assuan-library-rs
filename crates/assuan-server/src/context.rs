@@ -1,9 +1,11 @@
-use crate::HandlerError;
+use std::fmt;
+
 use assuan_protocol::{LineKind, MAX_LINE_BYTES, Sensitivity, ServerMachine, encode_data_chunk};
 use assuan_transport::Channel;
-use std::fmt;
 use tokio::time::Instant;
 use zeroize::{Zeroize, Zeroizing};
+
+use crate::HandlerError;
 
 /// Exclusive access to one invocation's channel and session-local state.
 ///

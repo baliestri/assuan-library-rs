@@ -1,10 +1,11 @@
 //! TCP failures, custom streams, short writes, and cancellation behavior.
 
+use std::{error::Error, io, time::Duration};
+
 use assuan_transport::{
   Acceptor, ConnectOptions, Endpoint, ListenOptions, Listener, LocalAccess, Stream, TransportError,
   connect,
 };
-use std::{error::Error, io, time::Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 async fn listener() -> Listener {

@@ -1,4 +1,5 @@
-//! Discovery diagnostics and missing executable errors require no `GnuPG` install.
+//! Discovery diagnostics and missing executable errors require no `GnuPG`
+//! install.
 
 use assuan_transport::{AgentLocator, TransportError};
 

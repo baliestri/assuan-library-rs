@@ -1,7 +1,8 @@
 //! Async framing over independent in-memory byte streams.
+use std::time::Duration;
+
 use assuan_protocol::Sensitivity;
 use assuan_transport::{Channel, Stream};
-use std::time::Duration;
 use tokio::{io::AsyncWriteExt, time::Instant};
 
 #[tokio::test]

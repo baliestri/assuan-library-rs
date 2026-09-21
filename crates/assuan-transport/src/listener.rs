@@ -1,5 +1,6 @@
-use crate::{Endpoint, ListenOptions, PeerIdentity, Stream, TransportError};
 use std::{fmt, future::Future, pin::Pin};
+
+use crate::{Endpoint, ListenOptions, PeerIdentity, Stream, TransportError};
 
 /// A borrowed, sendable transport operation returning a typed result.
 pub type IoFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T, TransportError>> + Send + 'a>>;
@@ -27,7 +28,8 @@ pub trait Acceptor: Send {
   /// Returns a standard transport address when the implementation has one.
   ///
   /// Defaults to `None`. Custom listeners need not invent an address or extend
-  /// [`Endpoint`]. This optional metadata does not control connection acceptance.
+  /// [`Endpoint`]. This optional metadata does not control connection
+  /// acceptance.
   fn endpoint(&self) -> Option<&Endpoint> {
     return None;
   }
@@ -64,7 +66,8 @@ impl Listener {
   ///
   /// # Errors
   /// Returns [`TransportError::Io`] if binding or querying the socket fails, or
-  /// [`TransportError::AccessPolicy`] if a Unix directory is not private and user-owned.
+  /// [`TransportError::AccessPolicy`] if a Unix directory is not private and
+  /// user-owned.
   ///
   /// # Panics
   /// Panics if called without a Tokio runtime with its I/O driver enabled.
@@ -97,18 +100,22 @@ impl Listener {
       }
     }
   }
-  /// Explicitly removes a Unix socket only if its recorded identity still matches.
+
+  /// Explicitly removes a Unix socket only if its recorded identity still
+  /// matches.
   ///
-  /// Checks the private parent directory's owner, permissions, device and inode,
-  /// and the socket's type, owner, device and inode. Success closes the listener;
-  /// repeated cleanup is harmless. TCP and named-pipe cleanup are no-ops. Drop only closes the
-  /// listener and never removes a pathname. Same-user and privileged processes
-  /// must be trusted: pathname checks cannot prevent their concurrent mutations.
+  /// Checks the private parent directory's owner, permissions, device and
+  /// inode, and the socket's type, owner, device and inode. Success closes
+  /// the listener; repeated cleanup is harmless. TCP and named-pipe cleanup
+  /// are no-ops. Drop only closes the listener and never removes a pathname.
+  /// Same-user and privileged processes must be trusted: pathname checks
+  /// cannot prevent their concurrent mutations.
   ///
   /// # Errors
-  /// Returns an access-policy error for changed identities or permissions, or an
-  /// I/O error when inspection or removal fails. A replacement is never removed
-  /// when detected. On failure the listener remains available for explicit handling.
+  /// Returns an access-policy error for changed identities or permissions, or
+  /// an I/O error when inspection or removal fails. A replacement is never
+  /// removed when detected. On failure the listener remains available for
+  /// explicit handling.
   pub fn cleanup(&mut self) -> Result<(), TransportError> {
     match &mut self.inner {
       #[cfg(windows)]
@@ -121,7 +128,8 @@ impl Listener {
 }
 
 impl Acceptor for Listener {
-  /// Waits for a connection and validates local peer credentials before delivery.
+  /// Waits for a connection and validates local peer credentials before
+  /// delivery.
   fn accept(&mut self) -> IoFuture<'_, Accepted> {
     return Box::pin(async move {
       match &self.inner {

@@ -1,11 +1,13 @@
-use crate::ClientError;
+use std::ops::Range;
+
 use assuan_protocol::{
   ClientMachine, ClientState, LineKind, Sensitivity, ServerLine, StateError, decode_data_in_place,
   parse_server_line,
 };
 use assuan_transport::Channel;
-use std::ops::Range;
 use tokio::time::Instant;
+
+use crate::ClientError;
 
 #[derive(Debug)]
 pub(crate) struct SessionCore {

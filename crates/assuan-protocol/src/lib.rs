@@ -13,13 +13,12 @@ mod message;
 mod secret;
 
 pub use command::Command;
+pub use encode::{encode_command, encode_data_chunk, encode_response};
 pub use error::{LimitError, ProtocolError};
 pub use escape::decode_data_in_place;
+pub use frame::{LineBuffer, MAX_LINE_BYTES};
 pub use message::{ServerLine, parse_server_line};
 pub use secret::{PayloadRef, SecretBytes, SecretRef, Sensitivity};
-
-pub use encode::{encode_command, encode_data_chunk, encode_response};
-pub use frame::{LineBuffer, MAX_LINE_BYTES};
 mod state;
 pub use state::{
   ClientMachine, ClientState, LineKind, RequestKind, ServerMachine, ServerState, StateError,

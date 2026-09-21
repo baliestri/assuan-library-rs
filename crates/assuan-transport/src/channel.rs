@@ -1,11 +1,13 @@
-use crate::{Stream, TransportError};
-use assuan_protocol::{LineBuffer, MAX_LINE_BYTES, ProtocolError, Sensitivity};
 use std::fmt;
+
+use assuan_protocol::{LineBuffer, MAX_LINE_BYTES, ProtocolError, Sensitivity};
 use tokio::{
   io::{AsyncReadExt, AsyncWriteExt},
   time::{Instant, timeout_at},
 };
 use zeroize::{Zeroize, Zeroizing};
+
+use crate::{Stream, TransportError};
 
 /// Bounded asynchronous line framing with borrowed, mutable receive storage.
 ///
@@ -59,8 +61,8 @@ impl Channel {
   /// already received remain buffered without another stream read.
   ///
   /// # Errors
-  /// Returns framing, I/O, closed-channel, or deadline errors. EOF while waiting
-  /// for a line is always an error, including EOF at a line boundary.
+  /// Returns framing, I/O, closed-channel, or deadline errors. EOF while
+  /// waiting for a line is always an error, including EOF at a line boundary.
   /// Error or cancellation wipes all buffers. Bytes may already have been
   /// consumed: the session owner must invalidate the session before reuse.
   ///
@@ -112,15 +114,17 @@ impl Channel {
 
   /// Writes one already encoded wire line, including its LF, then flushes.
   ///
-  /// The entire operation uses one deadline, including partial writes and flush.
-  /// A CR immediately before LF is allowed. This method does not encode payloads
-  /// or inspect command names. Caller-owned bytes are never wiped by the channel.
+  /// The entire operation uses one deadline, including partial writes and
+  /// flush. A CR immediately before LF is allowed. This method does not
+  /// encode payloads or inspect command names. Caller-owned bytes are never
+  /// wiped by the channel.
   ///
   /// # Errors
-  /// Rejects missing LF, embedded LF/NUL/CR, and lines over the wire limit before
-  /// I/O. Returns typed I/O, closed-channel, and timeout errors. Error or
-  /// cancellation wipes internal storage; partial delivery is possible and the
-  /// owner must invalidate the session before reuse. No retry is performed.
+  /// Rejects missing LF, embedded LF/NUL/CR, and lines over the wire limit
+  /// before I/O. Returns typed I/O, closed-channel, and timeout errors. Error
+  /// or cancellation wipes internal storage; partial delivery is possible and
+  /// the owner must invalidate the session before reuse. No retry is
+  /// performed.
   ///
   /// # Panics
   /// Requires a Tokio runtime with time enabled.
@@ -159,7 +163,8 @@ impl Channel {
     return Ok(());
   }
 
-  /// Drops the stream immediately and wipes every buffer; repeated calls are safe.
+  /// Drops the stream immediately and wipes every buffer; repeated calls are
+  /// safe.
   ///
   /// Does not flush or perform protocol shutdown. Pending acknowledgements must
   /// be handled by the session before closing.
@@ -200,12 +205,14 @@ impl Drop for Operation<'_> {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
   use std::{
     pin::Pin,
     task::{Context, Poll},
   };
+
   use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+
+  use super::*;
 
   fn deadline() -> Instant {
     return Instant::now() + std::time::Duration::from_secs(2);
@@ -285,9 +292,11 @@ mod tests {
     ) -> Poll<std::io::Result<usize>> {
       return Poll::Ready(Ok(bytes.len().min(2)));
     }
+
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
       return Poll::Pending;
     }
+
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
       return Poll::Ready(Ok(()));
     }

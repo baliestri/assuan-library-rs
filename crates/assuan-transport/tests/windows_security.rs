@@ -1,10 +1,11 @@
 //! Named-pipe lifecycle, deadlines, and invalid endpoint handling.
 #![cfg(windows)]
 
+use std::{io, time::Duration};
+
 use assuan_transport::{
   Acceptor, ConnectOptions, Endpoint, ListenOptions, Listener, TransportError, connect,
 };
-use std::{io, time::Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 fn endpoint() -> (tempfile::TempDir, Endpoint) {

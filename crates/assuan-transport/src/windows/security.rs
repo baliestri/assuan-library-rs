@@ -1,7 +1,8 @@
-use crate::TransportError;
 use interprocess::os::windows::security_descriptor::SecurityDescriptor;
 use widestring::U16CString;
 use winsafe::{HACCESSTOKEN, HPROCESS, TokenInfo, co};
+
+use crate::TransportError;
 
 pub(super) fn current_user_sid() -> Result<String, TransportError> {
   let token = HPROCESS::GetCurrentProcess()
@@ -38,8 +39,9 @@ fn descriptor_for_sid(sid: &str) -> Result<SecurityDescriptor, TransportError> {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
   use interprocess::os::windows::security_descriptor::AsSecurityDescriptorExt;
+
+  use super::*;
 
   #[test]
   fn acl_contains_only_the_current_user_and_is_protected() {

@@ -1,8 +1,3 @@
-use crate::{
-  ClientError,
-  session::{Received, SessionCore},
-  transaction::payload,
-};
 use assuan_protocol::{
   ClientState, LimitError, MAX_LINE_BYTES, PayloadRef, SecretBytes, SecretRef, Sensitivity,
   StateError, encode_data_chunk,
@@ -10,11 +5,18 @@ use assuan_protocol::{
 use tokio::time::Instant;
 use zeroize::{Zeroize, Zeroizing};
 
+use crate::{
+  ClientError,
+  session::{Received, SessionCore},
+  transaction::payload,
+};
+
 /// Exclusive permission to answer one server inquiry.
 ///
 /// Metadata is copied once into fixed protected storage, independently of the
 /// receive buffer. Dropping unfinished work invalidates the session. Forgetting
-/// this guard leaves the session in Inquiry, preventing another read or command.
+/// this guard leaves the session in Inquiry, preventing another read or
+/// command.
 #[derive(Debug)]
 #[must_use = "finish or cancel the inquiry before continuing the transaction"]
 pub struct Inquiry<'a> {
@@ -75,12 +77,14 @@ impl<'a> Inquiry<'a> {
 
   /// Sends raw public bytes as one or more escaped D lines.
   ///
-  /// Empty input emits an empty D line. Does not send END or extend the deadline.
+  /// Empty input emits an empty D line. Does not send END or extend the
+  /// deadline.
   ///
   /// # Errors
-  /// Rejects a call that exceeds the remaining decoded-byte budget before sending
-  /// any of that call's bytes. Limit, I/O, timeout, or uncertain-state failures
-  /// invalidate the session. Cancelling a pending write prevents reuse.
+  /// Rejects a call that exceeds the remaining decoded-byte budget before
+  /// sending any of that call's bytes. Limit, I/O, timeout, or
+  /// uncertain-state failures invalidate the session. Cancelling a pending
+  /// write prevents reuse.
   ///
   /// # Panics
   /// Requires a Tokio runtime with time enabled.
@@ -88,14 +92,16 @@ impl<'a> Inquiry<'a> {
     return self.send(bytes, Sensitivity::Public).await;
   }
 
-  /// Sends explicitly borrowed secret bytes using fixed protected scratch space.
+  /// Sends explicitly borrowed secret bytes using fixed protected scratch
+  /// space.
   ///
   /// Does not change how incoming responses are classified; use `command_with`
   /// before sending the command to classify the entire response as secret.
   ///
   /// # Errors
-  /// Has the same limits, cancellation, and invalidation behavior as `send_data`.
-  /// Caller-owned secret storage remains the caller's responsibility to wipe.
+  /// Has the same limits, cancellation, and invalidation behavior as
+  /// `send_data`. Caller-owned secret storage remains the caller's
+  /// responsibility to wipe.
   ///
   /// # Panics
   /// Requires a Tokio runtime with time enabled.

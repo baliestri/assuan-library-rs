@@ -1,12 +1,13 @@
 //! Consumer-defined byte streams work without standard endpoint metadata.
-use assuan_client::{Client, ClientOptions, Event};
-use assuan_protocol::Command;
-use assuan_transport::Stream;
 use std::{
   io,
   pin::Pin,
   task::{Context, Poll},
 };
+
+use assuan_client::{Client, ClientOptions, Event};
+use assuan_protocol::Command;
+use assuan_transport::Stream;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf};
 
 // Deliberately does not implement Debug or use a standard Endpoint.
@@ -30,9 +31,11 @@ impl AsyncWrite for CustomIo {
   ) -> Poll<io::Result<usize>> {
     return Pin::new(&mut self.get_mut().0).poll_write(cx, bytes);
   }
+
   fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
     return Pin::new(&mut self.get_mut().0).poll_flush(cx);
   }
+
   fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
     return Pin::new(&mut self.get_mut().0).poll_shutdown(cx);
   }

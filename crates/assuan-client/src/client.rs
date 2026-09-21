@@ -1,9 +1,10 @@
-use crate::{ClientError, ClientOptions, Transaction, options::deadline, session::SessionCore};
 use assuan_protocol::{
   ClientMachine, ClientState, Command, MAX_LINE_BYTES, Sensitivity, StateError, encode_command,
 };
 use assuan_transport::{Channel, ConnectOptions, Endpoint, Stream};
 use zeroize::Zeroizing;
+
+use crate::{ClientError, ClientOptions, Transaction, options::deadline, session::SessionCore};
 
 /// One serial Assuan session with exclusive, borrowed command transactions.
 ///
@@ -42,11 +43,13 @@ impl Client {
   /// Owns a standard or custom stream and waits for a successful greeting.
   ///
   /// Comments, empty lines, and status lines do not finish the greeting. An
-  /// greeting inquiry is cancelled with CAN; its final response is still required.
+  /// greeting inquiry is cancelled with CAN; its final response is still
+  /// required.
   ///
   /// # Errors
-  /// Returns typed timeout, I/O, greeting rejection, and malformed response errors.
-  /// Invalid durations are rejected before I/O. Error or cancellation drops the stream.
+  /// Returns typed timeout, I/O, greeting rejection, and malformed response
+  /// errors. Invalid durations are rejected before I/O. Error or cancellation
+  /// drops the stream.
   ///
   /// # Panics
   /// Requires a Tokio runtime with time enabled.
@@ -87,9 +90,10 @@ impl Client {
   /// Connects and delegates greeting inquiries to a caller-provided handler.
   ///
   /// # Errors
-  /// Returns option, connection, greeting, callback, or timeout errors. Callback
-  /// failure or cancellation closes the owned connection. Each inquiry must be
-  /// finished or cancelled; returning successfully without doing so is an error.
+  /// Returns option, connection, greeting, callback, or timeout errors.
+  /// Callback failure or cancellation closes the owned connection. Each
+  /// inquiry must be finished or cancelled; returning successfully without
+  /// doing so is an error.
   ///
   /// # Panics
   /// Requires a Tokio runtime with I/O and time enabled.
@@ -108,11 +112,13 @@ impl Client {
     .await?;
     return Self::handshake(stream, options).drive(Some(handler)).await;
   }
+
   /// Validates and sends a command, borrowing this session until completion.
   ///
-  /// Arguments are already in wire representation. Encoding uses fixed protected
-  /// heap storage before reserving the session or sending any bytes. Replies are
-  /// classified as public; internal buffers are nevertheless always wiped.
+  /// Arguments are already in wire representation. Encoding uses fixed
+  /// protected heap storage before reserving the session or sending any
+  /// bytes. Replies are classified as public; internal buffers are
+  /// nevertheless always wiped.
   ///
   /// # Errors
   /// Local length errors leave a ready session reusable. Unfinished prior work,
@@ -163,7 +169,8 @@ impl Client {
     });
   }
 
-  /// Reports readiness without I/O; uncertainty or unfinished work returns false.
+  /// Reports readiness without I/O; uncertainty or unfinished work returns
+  /// false.
   ///
   /// This is local session state, not a liveness probe of the remote peer.
   #[must_use]

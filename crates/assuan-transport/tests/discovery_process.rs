@@ -1,12 +1,13 @@
 //! Bounded subprocess discovery, using an explicitly selected fixture binary.
 #![cfg(feature = "test-fixtures")]
 
-use assuan_transport::{AgentLocator, DiscoveryError, Endpoint, TransportError};
 use std::{
   fs,
   path::Path,
   time::{Duration, Instant},
 };
+
+use assuan_transport::{AgentLocator, DiscoveryError, Endpoint, TransportError};
 
 fn fixture(mode: &str, output: &[u8]) -> (tempfile::TempDir, AgentLocator) {
   let home = tempfile::Builder::new().prefix("gpg home % ; ").tempdir().unwrap();

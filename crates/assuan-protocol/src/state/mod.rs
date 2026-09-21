@@ -3,11 +3,12 @@
 mod client;
 mod server;
 
+use core::fmt;
+
 pub use client::{ClientMachine, ClientState};
 pub use server::{ServerMachine, ServerState};
 
 use crate::ServerLine;
-use core::fmt;
 
 /// Response categories, without payload bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

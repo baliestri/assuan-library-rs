@@ -61,10 +61,10 @@ impl Sexpr<'_> {
   /// # Examples
   ///
   /// ```
-  /// use assuan_sexpr::{parse_complete, OwnedSexpr, ParseLimits};
+  /// use assuan_sexpr::{OwnedSexpr, ParseLimits, parse_complete};
   /// let owned = {
-  ///     let input = Vec::from(b"3:key");
-  ///     parse_complete(&input, ParseLimits::default())?.to_owned()
+  ///   let input = Vec::from(b"3:key");
+  ///   parse_complete(&input, ParseLimits::default())?.to_owned()
   /// };
   /// assert_eq!(owned, OwnedSexpr::Atom(Box::from(&b"key"[..])));
   /// # Ok::<(), assuan_sexpr::ParseError>(())

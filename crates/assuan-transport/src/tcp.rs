@@ -1,6 +1,8 @@
-use crate::{ConnectOptions, Endpoint, Stream, TransportError};
 use std::future::Future;
+
 use tokio::time::{Instant, timeout_at};
+
+use crate::{ConnectOptions, Endpoint, Stream, TransportError};
 
 /// Connects to an endpoint within the configured total deadline.
 ///
@@ -53,8 +55,9 @@ async fn within_deadline<T>(
 
 #[cfg(test)]
 mod tests {
-  use super::*;
   use std::{future::pending, time::Duration};
+
+  use super::*;
 
   #[tokio::test(start_paused = true)]
   async fn pending_attempt_expires_at_total_deadline() {

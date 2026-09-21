@@ -1,4 +1,5 @@
-//! Deterministic discovery subprocess, enabled only by the test-fixtures feature.
+//! Deterministic discovery subprocess, enabled only by the test-fixtures
+//! feature.
 
 use std::{
   fs,

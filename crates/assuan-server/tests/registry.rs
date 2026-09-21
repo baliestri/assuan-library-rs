@@ -13,9 +13,11 @@ impl assuan_server::Handler for Named {
   fn name(&self) -> &str {
     return &self.0;
   }
+
   fn description(&self) -> &str {
     return "Description";
   }
+
   fn call<'a>(&'a self, command: Command<'a>, context: CommandContext<'a>) -> HandlerFuture<'a> {
     return noop(command, context);
   }

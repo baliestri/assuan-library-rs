@@ -1,8 +1,9 @@
 //! Total operation deadlines and cancellation cannot resurrect a session.
+use std::time::Duration;
+
 use assuan_client::{Client, ClientError, ClientOptions};
 use assuan_protocol::Command;
 use assuan_transport::{Stream, TransportError};
-use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::test(start_paused = true)]

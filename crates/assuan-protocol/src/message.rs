@@ -54,8 +54,8 @@ pub enum ServerLine<'a> {
 /// Returns [`ProtocolError::InvalidLine`] for embedded NUL, CR, or LF;
 /// [`ProtocolError::InvalidResponse`] for an unknown or malformed response;
 /// [`ProtocolError::InvalidToken`] for invalid keywords; or
-/// [`ProtocolError::InvalidErrorCode`] for a missing, nondecimal, or overflowing
-/// error code. Data escapes are validated separately when decoded.
+/// [`ProtocolError::InvalidErrorCode`] for a missing, nondecimal, or
+/// overflowing error code. Data escapes are validated separately when decoded.
 pub fn parse_server_line(line: &[u8]) -> Result<ServerLine<'_>, ProtocolError> {
   validate_line(line)?;
 

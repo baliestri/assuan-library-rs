@@ -1,6 +1,5 @@
 //! User-provided transports and listeners delegate I/O without unsafe code.
 
-use assuan_transport::{Accepted, Acceptor, IoFuture, Stream, TransportError};
 use std::{
   io,
   pin::Pin,
@@ -10,6 +9,8 @@ use std::{
   },
   task::{Context, Poll},
 };
+
+use assuan_transport::{Accepted, Acceptor, IoFuture, Stream, TransportError};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 struct AuditedStream(Arc<AtomicUsize>);
@@ -32,17 +33,21 @@ impl AsyncWrite for AuditedStream {
   ) -> Poll<io::Result<usize>> {
     return Poll::Ready(Ok(bytes.len()));
   }
+
   fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
     self.0.fetch_or(1, Ordering::SeqCst);
     return Poll::Ready(Ok(()));
   }
+
   fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
     self.0.fetch_or(2, Ordering::SeqCst);
     return Poll::Ready(Ok(()));
   }
+
   fn is_write_vectored(&self) -> bool {
     return true;
   }
+
   fn poll_write_vectored(
     self: Pin<&mut Self>,
     _: &mut Context<'_>,

@@ -27,8 +27,8 @@ pub fn encode_command(
 ///
 /// Returns `(input_consumed, output_written)`. Percent, CR, LF, and NUL become
 /// uppercase percent escapes; other bytes are copied unchanged. Empty input
-/// emits `D \n`. Nonempty input always makes progress. Repeat with the remaining
-/// input to stream a larger payload. No escape is split across lines.
+/// emits `D \n`. Nonempty input always makes progress. Repeat with the
+/// remaining input to stream a larger payload. No escape is split across lines.
 /// The output allocation and its cleanup remain the caller's responsibility.
 ///
 /// # Errors

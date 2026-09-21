@@ -49,8 +49,9 @@ impl ClientMachine {
   /// Reserves the ready session for exactly one command.
   ///
   /// # Errors
-  /// Returns [`StateError::NotReady`] outside Ready, or [`StateError::Unusable`]
-  /// after invalidation/closure. A rejected local request preserves state.
+  /// Returns [`StateError::NotReady`] outside Ready, or
+  /// [`StateError::Unusable`] after invalidation/closure. A rejected local
+  /// request preserves state.
   pub fn begin_command(&mut self) -> Result<(), StateError> {
     match self.state {
       ClientState::Ready => {
@@ -65,9 +66,10 @@ impl ClientMachine {
   /// Applies a validated server response category.
   ///
   /// Comments and empty lines are ignored in live phases. Status is allowed
-  /// during greeting, command, inquiry, and cancellation drain. Data and partial
-  /// END are allowed only during a command. A final ERR completes a command,
-  /// but rejects a greeting. An inquiry remembers its originating phase.
+  /// during greeting, command, inquiry, and cancellation drain. Data and
+  /// partial END are allowed only during a command. A final ERR completes a
+  /// command, but rejects a greeting. An inquiry remembers its originating
+  /// phase.
   ///
   /// # Errors
   /// Returns [`StateError::UnexpectedEvent`] and invalidates on an illegal
@@ -111,8 +113,9 @@ impl ClientMachine {
   /// it does not finish the enclosing operation or release the connection.
   ///
   /// # Errors
-  /// Returns [`StateError::NotReady`] outside Inquiry or [`StateError::Unusable`]
-  /// after invalidation/closure, without changing state.
+  /// Returns [`StateError::NotReady`] outside Inquiry or
+  /// [`StateError::Unusable`] after invalidation/closure, without changing
+  /// state.
   pub fn finish_inquiry(&mut self, cancelled: bool) -> Result<(), StateError> {
     match self.state {
       ClientState::Invalid | ClientState::Closed => return Err(StateError::Unusable),

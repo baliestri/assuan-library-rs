@@ -36,7 +36,7 @@ fn writer_preserves_an_existing_prefix() {
 #[test]
 fn length_prefixes_cover_decimal_boundaries() {
   for length in [0, 1, 9, 10, 99, 100, 999, 1000] {
-    let atom = vec![0xff; length];
+    let atom = vec![0xFF; length];
     let wire = Sexpr::Atom(&atom).to_canonical().unwrap();
     let prefix = format!("{length}:");
     assert!(wire.starts_with(prefix.as_bytes()));

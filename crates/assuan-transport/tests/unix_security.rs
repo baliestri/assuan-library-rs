@@ -1,12 +1,13 @@
 //! Filesystem identity, local credentials, and cleanup regressions.
 #![cfg(unix)]
 
-use assuan_transport::{
-  Acceptor, ConnectOptions, Endpoint, ListenOptions, Listener, PeerIdentity, TransportError,
-};
 use std::{
   fs,
   os::unix::fs::{PermissionsExt, symlink},
+};
+
+use assuan_transport::{
+  Acceptor, ConnectOptions, Endpoint, ListenOptions, Listener, PeerIdentity, TransportError,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 

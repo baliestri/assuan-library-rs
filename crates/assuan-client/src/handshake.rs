@@ -1,19 +1,23 @@
+use std::{future::Future, pin::Pin};
+
+use assuan_transport::TransportError;
+use tokio::time::timeout_at;
+
 use crate::{
   Client, ClientError, Event, Inquiry,
   transaction::{Completion, next_event},
 };
-use assuan_transport::TransportError;
-use std::{future::Future, pin::Pin};
-use tokio::time::timeout_at;
 
-/// A sendable callback future borrowing the handler and inquiry for one response.
+/// A sendable callback future borrowing the handler and inquiry for one
+/// response.
 pub type ClientFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T, ClientError>> + Send + 'a>>;
 
 /// Answers greeting inquiries without requiring a manually driven handshake.
 ///
 /// Complete each inquiry with finish or cancel. An error, abandonment, or a
 /// callback exceeding the greeting deadline closes the connection. Callback
-/// errors are returned to the caller without incorporating metadata in messages.
+/// errors are returned to the caller without incorporating metadata in
+/// messages.
 pub trait GreetingHandler: Send {
   /// Handles one exclusive inquiry within the total greeting deadline.
   fn respond<'a>(&'a mut self, inquiry: Inquiry<'a>) -> ClientFuture<'a, ()>;

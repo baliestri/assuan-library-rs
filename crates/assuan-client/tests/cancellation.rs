@@ -33,7 +33,8 @@ async fn partially_written_secret_cancelled_with_slow_peer_invalidates() {
     peer.read_exact(&mut prefix).await.unwrap();
     assert_eq!(&prefix, b"D ");
     notification.send(()).unwrap();
-    // Return ownership without draining; this intentionally applies backpressure.
+    // Return ownership without draining; this intentionally applies
+    // backpressure.
     return peer;
   });
   let mut client = Client::from_stream(Stream::new(io), ClientOptions::default()).await.unwrap();
@@ -62,9 +63,10 @@ async fn partially_written_secret_cancelled_with_slow_peer_invalidates() {
 
 #[tokio::test(start_paused = true)]
 async fn inquiry_deadline_is_the_minimum_of_local_and_enclosing_deadlines() {
+  use std::time::Duration;
+
   use assuan_client::{ClientError, Event};
   use assuan_transport::TransportError;
-  use std::time::Duration;
   for (command, inquiry) in [(3, 10), (10, 3)] {
     let (io, mut peer) = tokio::io::duplex(128);
     peer.write_all(b"OK\n").await.unwrap();
@@ -90,9 +92,10 @@ async fn inquiry_deadline_is_the_minimum_of_local_and_enclosing_deadlines() {
 
 #[tokio::test(start_paused = true)]
 async fn slowly_arriving_greeting_bytes_do_not_restart_its_deadline() {
+  use std::time::Duration;
+
   use assuan_client::ClientError;
   use assuan_transport::TransportError;
-  use std::time::Duration;
   let (io, mut peer) = tokio::io::duplex(8);
   let remote = tokio::spawn(async move {
     for byte in b"OK\n" {

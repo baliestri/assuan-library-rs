@@ -1,14 +1,18 @@
-use crate::{ClientError, session::SessionCore};
-use assuan_protocol::{ClientState, LineKind, PayloadRef, SecretRef, Sensitivity};
 use std::fmt;
 
-/// One response borrowing the session's receive buffer until the next mutable use.
+use assuan_protocol::{ClientState, LineKind, PayloadRef, SecretRef, Sensitivity};
+
+use crate::{ClientError, session::SessionCore};
+
+/// One response borrowing the session's receive buffer until the next mutable
+/// use.
 ///
 /// Data is percent-decoded in place; other fields retain their wire bytes.
 /// Debug omits all received strings, including status keywords.
 #[non_exhaustive]
 pub enum Event<'a> {
-  /// Exclusive request for client-provided data; finish or cancel before reading again.
+  /// Exclusive request for client-provided data; finish or cancel before
+  /// reading again.
   Inquire(crate::Inquiry<'a>),
   /// A decoded data segment; does not complete the transaction.
   Data(PayloadRef<'a>),
@@ -49,10 +53,12 @@ impl fmt::Debug for Event<'_> {
   }
 }
 
-/// An exclusive command transaction; dropping unfinished work closes its stream.
+/// An exclusive command transaction; dropping unfinished work closes its
+/// stream.
 ///
 /// Forgetting this guard does not reset the client's command phase. Receiving a
-/// final response makes dropping the guard safe; finish performs no network I/O.
+/// final response makes dropping the guard safe; finish performs no network
+/// I/O.
 #[derive(Debug)]
 #[must_use = "consume the final response and finish the transaction"]
 pub struct Transaction<'a> {
@@ -88,14 +94,17 @@ impl Transaction<'_> {
   /// Consumes an already completed transaction, without draining or other I/O.
   ///
   /// # Errors
-  /// Returns the full remote ERR code, or Incomplete and closes the stream if no
-  /// final response was received. A normal remote error preserves session reuse.
+  /// Returns the full remote ERR code, or Incomplete and closes the stream if
+  /// no final response was received. A normal remote error preserves session
+  /// reuse.
   pub fn finish(self) -> Result<(), ClientError> {
     self.core.check()?;
     return match self.completion {
-      Completion::Remote(code) => Err(ClientError::Remote {
-        code,
-      }),
+      Completion::Remote(code) => {
+        Err(ClientError::Remote {
+          code,
+        })
+      }
       Completion::Success => Ok(()),
       Completion::Pending => Err(ClientError::Incomplete),
     };
@@ -147,15 +156,19 @@ pub(crate) async fn next_event<'a>(
     LineKind::Data => Event::Data(payload),
     LineKind::Comment => Event::Comment(payload),
     LineKind::End => Event::End,
-    LineKind::Status => Event::Status {
-      keyword: std::str::from_utf8(&line[received.keyword])
-        .map_err(|_| return ClientError::Incomplete)?,
-      args: payload,
-    },
-    LineKind::Ok | LineKind::Err => Event::Finished {
-      code: received.code,
-      text: payload,
-    },
+    LineKind::Status => {
+      Event::Status {
+        keyword: std::str::from_utf8(&line[received.keyword])
+          .map_err(|_| return ClientError::Incomplete)?,
+        args: payload,
+      }
+    }
+    LineKind::Ok | LineKind::Err => {
+      Event::Finished {
+        code: received.code,
+        text: payload,
+      }
+    }
     LineKind::Empty | LineKind::Inquire => return Err(ClientError::Incomplete),
   };
   return Ok(Some(event));

@@ -1,9 +1,10 @@
-use crate::{Accepted, PeerIdentity, Stream, TransportError};
 use std::{
   fs, io,
   os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt},
   path::{Path, PathBuf},
 };
+
+use crate::{Accepted, PeerIdentity, Stream, TransportError};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct FileIdentity {
@@ -48,7 +49,8 @@ impl UnixListener {
       Err(error) => return Err(error.into()),
     }
     // The private directory prevents another OS user from racing the path.
-    // Same-user processes and privileged processes are part of the trust boundary.
+    // Same-user processes and privileged processes are part of the trust
+    // boundary.
     let inner = tokio::net::UnixListener::bind(&path)?;
     let metadata = fs::symlink_metadata(&path)?;
     if !metadata.file_type().is_socket() || metadata.uid() != uid {

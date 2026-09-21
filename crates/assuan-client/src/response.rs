@@ -1,5 +1,6 @@
-use crate::{ClientError, Event, Transaction};
 use assuan_protocol::{Command, PayloadRef, SecretBytes, SecretRef, Sensitivity};
+
+use crate::{ClientError, Event, Transaction};
 
 /// Finite retention limits for a collected response.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,7 +121,8 @@ impl crate::Client {
     return Ok(response);
   }
 
-  /// Collects a bounded response in protected storage, cancelling inquiries automatically.
+  /// Collects a bounded response in protected storage, cancelling inquiries
+  /// automatically.
   ///
   /// # Errors
   /// Returns protocol, transport, inquiry, or retention-limit failures.

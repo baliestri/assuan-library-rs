@@ -1,4 +1,5 @@
 use core::fmt;
+
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::ProtocolError;
@@ -9,10 +10,10 @@ pub const MAX_LINE_BYTES: usize = 1000;
 /// Incrementally assembles one line in fixed storage, without heap allocation.
 ///
 /// Unconsumed input belongs to the caller. A complete line remains available
-/// until [`Self::clear`]. Storage is wiped on clear, framing failure, and normal
-/// drop. As with other stack values, moving this buffer may leave earlier
-/// copies; pinning or owning protected I/O storage is the transport's concern.
-/// Debug output never includes buffered bytes.
+/// until [`Self::clear`]. Storage is wiped on clear, framing failure, and
+/// normal drop. As with other stack values, moving this buffer may leave
+/// earlier copies; pinning or owning protected I/O storage is the transport's
+/// concern. Debug output never includes buffered bytes.
 pub struct LineBuffer {
   storage: Zeroizing<[u8; MAX_LINE_BYTES]>,
   len: usize,

@@ -1,11 +1,3 @@
-use crate::{Accepted, Stream, TransportError};
-use interprocess::{
-  ConnectWaitMode,
-  os::windows::named_pipe::{
-    PipeListenerOptions, pipe_mode,
-    tokio::{DuplexPipeStream, PipeListener as NativeListener},
-  },
-};
 use std::{
   io,
   os::windows::ffi::OsStrExt,
@@ -14,7 +6,17 @@ use std::{
   task::{Context, Poll},
   time::Duration,
 };
+
+use interprocess::{
+  ConnectWaitMode,
+  os::windows::named_pipe::{
+    PipeListenerOptions, pipe_mode,
+    tokio::{DuplexPipeStream, PipeListener as NativeListener},
+  },
+};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+
+use crate::{Accepted, Stream, TransportError};
 
 type NativeStream = DuplexPipeStream<pipe_mode::Bytes>;
 
@@ -125,12 +127,14 @@ impl AsyncWrite for PipeStream {
     };
     return Pin::new(stream).poll_write(cx, bytes);
   }
+
   fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
     if self.inner.is_none() {
       return Poll::Ready(Err(io::ErrorKind::BrokenPipe.into()));
     }
     return Poll::Ready(Ok(()));
   }
+
   fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
     if let Some(stream) = self.get_mut().inner.take() {
       stream.evade_limbo();
