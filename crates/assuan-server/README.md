@@ -6,8 +6,14 @@ and an explicit command registry.
 `Session::new` owns an `Accepted` stream, typed state, shared registry, hooks,
 and `ServerOptions`. This works with standard listeners and custom streams.
 `run` authenticates before greeting OK and processes commands serially.
-OPTION and RESET dispatch to typed hooks. NOP, BYE, HELP and bounded concurrent
-serving are scheduled for the next implementation step.
+OPTION and RESET dispatch to typed hooks. NOP succeeds without changing state;
+BYE sends OK before closing. HELP lists built-ins and registered handlers as
+comment lines, splitting long descriptions on UTF-8 boundaries within the
+wire limit. Registry iteration order is unspecified.
+
+`Server::new` accepts a state factory and options. Register handlers and set
+hooks before calling `Server::serve` with a standard `Listener` or custom
+`Acceptor`. A custom acceptor may leave `endpoint()` at its default None.
 
 Implement `Handler<S>` directly or use `handler` to adapt a function or closure.
 Each session owns its application state `S`; handlers borrow it exclusively
@@ -68,3 +74,48 @@ failure logging uses the `log` facade and emits only a category. Dropping or
 aborting the run future, or unwinding an application panic, closes the owned
 stream but cannot await this hook. No cleanup task is spawned in Drop; keep
 essential synchronous resource cleanup in your state types' destructors.
+
+## Concurrent serving
+
+The default limit is 128 sessions. A permit is acquired before polling accept
+and retained through authentication, commands, and the close hook. A stalled
+session does not block another when capacity remains. At capacity the library
+does not create pending session tasks; the transport controls its own backlog.
+Completed tasks are reaped while serving. Session failures and task panics are
+isolated; library diagnostics log only their categories.
+
+When the shutdown future resolves, the acceptor is dropped and existing
+sessions receive one shared grace period (30 seconds by default). Sessions can
+finish work or issue BYE during that period. Remaining tasks are then aborted
+and joined. Async deadlines require cooperative code; they cannot preempt a
+handler that blocks a runtime thread indefinitely. Dropping serve also aborts
+its tasks, but cannot await cleanup.
+
+`ServerOptions::with_max_sessions`, `with_max_inquiry_bytes`, and the
+`with_*_timeout` builders validate all configured limits. Direct field edits
+are checked again before serving or running a session.
+
+```no_run
+# async fn run(shutdown: impl std::future::Future<Output = ()> + Send)
+#   -> Result<(), Box<dyn std::error::Error>> {
+use assuan_protocol::Command;
+use assuan_server::{CommandContext, HandlerFuture, Server, ServerOptions, handler};
+use assuan_transport::{Endpoint, ListenOptions, Listener};
+
+fn echo<'a>(command: Command<'a>, mut ctx: CommandContext<'a>) -> HandlerFuture<'a> {
+  return Box::pin(async move { return ctx.send_data(command.args()).await; });
+}
+
+let options = ServerOptions::default().with_max_sessions(128)?;
+let mut server = Server::new(|| (), options);
+server.register(handler("ECHO", "Returns the original arguments", echo)?)?;
+let endpoint = Endpoint::Tcp("127.0.0.1:9000".parse()?);
+let listener = Listener::bind(&endpoint, &ListenOptions::default()).await?;
+server.serve(listener, shutdown).await?;
+# return Ok(());
+# }
+```
+
+Accept errors stop serving and are returned after draining existing sessions.
+Transport-specific filesystem cleanup remains explicit: dropping a Unix
+listener closes its socket but does not unlink its pathname.

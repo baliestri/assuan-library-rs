@@ -15,12 +15,13 @@ readme = "README.md"
 [dependencies]
 assuan-protocol = { version = "0.1.0", path = "../assuan-protocol" }
 assuan-transport = { version = "0.1.0", path = "../assuan-transport" }
-tokio = { workspace = true, features = ["time"] }
+tokio = { workspace = true, features = ["time", "rt", "sync", "macros"] }
 zeroize.workspace = true
 thiserror.workspace = true
 log.workspace = true
 
 [dev-dependencies]
+assuan-client = { path = "../assuan-client" }
 tokio = { workspace = true, features = ["macros", "rt", "io-util", "test-util"] }
 
 [lints]

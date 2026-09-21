@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+mod builtins;
 mod context;
 mod error;
 mod handler;
@@ -7,6 +8,7 @@ mod hooks;
 mod inquiry;
 mod options;
 mod registry;
+mod server;
 mod session;
 
 pub use context::CommandContext;
@@ -16,4 +18,5 @@ pub use hooks::{DefaultHooks, HookFuture, OptionRequest, SessionEnd, SessionHook
 pub use inquiry::{InquiryOutcome, ServerInquiry};
 pub use options::ServerOptions;
 pub use registry::{Registry, handler};
+pub use server::Server;
 pub use session::Session;

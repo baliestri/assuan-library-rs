@@ -138,12 +138,15 @@ impl<S: Send + 'static> Session<S> {
         break line.len();
       };
       let command = Command::parse(&call[..len])?;
+      let closing = command.name() == "BYE";
       let command_deadline = deadline(self.options.command_timeout)?;
       let registry = Arc::clone(&self.registry);
       let hooks = Arc::clone(&self.hooks);
       let result = timeout_at(command_deadline, async {
         let context = self.context(command_deadline);
         match command.name() {
+          "NOP" | "BYE" => return Ok(()),
+          "HELP" => return crate::builtins::help(&registry, context).await,
           "OPTION" => {
             let request = OptionRequest::parse(command.args()).map_err(|_| {
               return HandlerError::Remote {
@@ -168,6 +171,9 @@ impl<S: Send + 'static> Session<S> {
       .await
       .map_err(|_| return ServerError::Transport(TransportError::Timeout))?;
       self.finalize(result, command_deadline, false).await?;
+      if closing {
+        return Ok(());
+      }
     }
   }
 
@@ -238,7 +244,7 @@ impl<S: Send + 'static> fmt::Debug for Session<S> {
   }
 }
 
-fn end_reason(error: &ServerError) -> SessionEnd {
+pub(crate) fn end_reason(error: &ServerError) -> SessionEnd {
   return match error {
     ServerError::Transport(TransportError::Timeout)
     | ServerError::Handler(HandlerError::Transport(TransportError::Timeout)) => SessionEnd::Timeout,

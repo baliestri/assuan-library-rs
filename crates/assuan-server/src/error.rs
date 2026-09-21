@@ -142,7 +142,8 @@ pub enum ServerError {
   /// A fatal handler operation, authentication, or the close hook failed.
   #[error("server handler or hook failure")]
   Handler(#[source] HandlerError),
-  /// Options have a zero limit or an unrepresentable deadline.
+  /// Options have a zero limit, unsupported concurrency, or an unrepresentable
+  /// deadline.
   #[error("invalid server options")]
   InvalidOptions,
 }

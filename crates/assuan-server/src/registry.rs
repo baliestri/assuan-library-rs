@@ -60,6 +60,10 @@ impl<S: Send + 'static> Registry<S> {
   pub fn get(&self, name: &str) -> Option<&dyn Handler<S>> {
     return self.handlers.get(name).map(|handler| return handler.as_ref());
   }
+
+  pub(crate) fn entries(&self) -> impl Iterator<Item = (&str, &dyn Handler<S>)> {
+    return self.handlers.iter().map(|(name, handler)| return (name.as_str(), handler.as_ref()));
+  }
 }
 
 impl<S: Send + 'static> fmt::Debug for Registry<S> {
