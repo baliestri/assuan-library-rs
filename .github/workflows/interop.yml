@@ -18,7 +18,6 @@ jobs:
     timeout-minutes: 20
     env:
       ASSUAN_GNUPG_REQUIRED: "1"
-      CARGO_TARGET_DIR: ${{ runner.temp }}/assuan-target
     steps:
       - uses: actions/checkout@v6
         with:
@@ -54,8 +53,12 @@ jobs:
           "ASSUAN_GPG_CONNECT_AGENT=$(Join-Path $bin 'gpg-connect-agent.exe')" >> $env:GITHUB_ENV
       - name: Test independent peers and isolated agent
         if: runner.os != 'Windows'
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/assuan-target
         run: cargo test -p assuan-library --test interop_agent --test interop_server -- --nocapture
       - name: Test with short Windows tool paths
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/assuan-target
         run: ./scripts/test-interop.ps1
