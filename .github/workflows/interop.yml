@@ -42,10 +42,11 @@ jobs:
           echo "ASSUAN_GPG_CONNECT_AGENT=$(brew --prefix gnupg)/bin/gpg-connect-agent" >> "$GITHUB_ENV"
       - name: Install GnuPG on Windows
         if: runner.os == 'Windows'
+        timeout-minutes: 4
         shell: pwsh
         run: |
-          choco install gpg4win --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw 'Gpg4win installation failed' }
+          choco install gnupg --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'GnuPG installation failed' }
           $candidates = @("${env:ProgramFiles(x86)}\GnuPG\bin", "$env:ProgramFiles\GnuPG\bin")
           $bin = $candidates | Where-Object { Test-Path -LiteralPath (Join-Path $_ 'gpgconf.exe') } | Select-Object -First 1
           if (-not $bin) { throw 'Native GnuPG executables were not found' }
