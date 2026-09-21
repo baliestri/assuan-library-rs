@@ -71,8 +71,30 @@ impl Channel {
   pub async fn read_line(
     &mut self,
     deadline: Instant,
-    _sensitivity: Sensitivity,
+    sensitivity: Sensitivity,
   ) -> Result<&mut [u8], TransportError> {
+    return self
+      .read_line_or_eof(deadline, sensitivity)
+      .await?
+      .ok_or(ProtocolError::UnexpectedEof.into());
+  }
+
+  /// Reads a complete line, or returns None for EOF exactly at a line boundary.
+  ///
+  /// A partial line at EOF remains an error. Only a session waiting for its
+  /// next command should interpret None as clean completion. Buffer wiping
+  /// and cancellation behavior are identical to [`Self::read_line`].
+  ///
+  /// # Errors
+  /// Returns framing, I/O, closed-channel, or total-deadline errors.
+  ///
+  /// # Panics
+  /// Requires a Tokio runtime with time enabled.
+  pub async fn read_line_or_eof(
+    &mut self,
+    deadline: Instant,
+    _sensitivity: Sensitivity,
+  ) -> Result<Option<&mut [u8]>, TransportError> {
     {
       let mut operation = Operation {
         channel: self,
@@ -87,7 +109,7 @@ impl Channel {
         .map_err(|_| return TransportError::Timeout)??;
       operation.complete = true;
     }
-    return self.line.line_mut().ok_or(TransportError::Closed);
+    return Ok(self.line.line_mut());
   }
 
   async fn receive(&mut self) -> Result<(), TransportError> {
@@ -107,7 +129,8 @@ impl Channel {
       self.pending =
         self.stream.as_mut().ok_or(TransportError::Closed)?.read(&mut self.ahead).await?;
       if self.pending == 0 {
-        return Err(ProtocolError::UnexpectedEof.into());
+        self.line.finish_eof()?;
+        return Ok(());
       }
     }
   }

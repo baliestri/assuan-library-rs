@@ -1,9 +1,13 @@
 # assuan-server
 
-Typed asynchronous Assuan handler contracts and an explicit command registry.
-This crate currently provides the handler foundation; the session runner,
-built-in dispatch, hooks, inquiries, and concurrent serving are subsequent
-implementation steps.
+Typed asynchronous Assuan sessions, streaming inquiries, application hooks,
+and an explicit command registry.
+
+`Session::new` owns an `Accepted` stream, typed state, shared registry, hooks,
+and `ServerOptions`. This works with standard listeners and custom streams.
+`run` authenticates before greeting OK and processes commands serially.
+OPTION and RESET dispatch to typed hooks. NOP, BYE, HELP and bounded concurrent
+serving are scheduled for the next implementation step.
 
 Implement `Handler<S>` directly or use `handler` to adapt a function or closure.
 Each session owns its application state `S`; handlers borrow it exclusively
@@ -25,3 +29,42 @@ error text. Remote error text is intended for the peer and must contain only
 public information.
 
 See `handler` for a complete registration example.
+
+## Session policy
+
+`DefaultHooks` accepts connections already admitted by the listener and rejects
+unknown options. It performs no additional authentication. TCP has no OS peer
+identity; applications needing authentication must install `SessionHooks`.
+Hooks can inspect `CommandContext::peer` and borrow session state. RESET keeps
+the library's authentication flag; the reset hook must also preserve the
+application's authentication fields while clearing its transient fields.
+
+Success produces exactly one OK. A validated remote error produces one ERR;
+an internal error produces only generic text. Both ordinary command failures
+leave the session reusable. Protocol failures, invalid remote text, unfinished
+inquiries, and uncertain I/O close the stream without a final response.
+Numeric error codes follow
+[libgpg-error](https://github.com/gpg/libgpg-error/blob/master/src/err-codes.h.in).
+OPTION parsing follows the
+[Assuan request syntax](https://www.gnupg.org/documentation/manuals/assuan/Client-requests.html).
+
+One fixed, protected command buffer copies at most one 1,000-byte wire line.
+Handlers borrow this buffer across awaits while using the mutable channel.
+Data returned by `ServerInquiry::next` borrows channel storage and is decoded
+in place. Choose `Sensitivity` before starting the inquiry. Consume until None,
+then call `finish` to distinguish END from CAN; CAN leaves the application
+decision to the handler. Finish does not drain unread data. Abandoning an
+inquiry closes the stream, and forgetting it prevents session reuse.
+
+Default total budgets are 120 seconds for authentication/greeting, 300 seconds
+per command, 120 seconds per inquiry, 300 seconds between commands, and 30
+seconds for the close hook. An inquiry cannot extend its enclosing deadline.
+Each inquiry accepts at most one MiB of decoded bytes. All limits must be
+positive. Comments, fragments and data chunks do not restart deadlines.
+
+The close hook runs after disconnection or a returned error, once the channel
+is closed. Its failure never replaces an earlier session error. Secondary
+failure logging uses the `log` facade and emits only a category. Dropping or
+aborting the run future, or unwinding an application panic, closes the owned
+stream but cannot await this hook. No cleanup task is spawned in Drop; keep
+essential synchronous resource cleanup in your state types' destructors.

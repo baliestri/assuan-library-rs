@@ -45,6 +45,9 @@ async fn registered_handler_borrows_arguments_across_await_and_mutates_non_sync_
     machine: &mut machine,
     state: &mut state,
     deadline: Instant::now() + Duration::from_secs(1),
+    options: &ServerOptions::default(),
+    peer: None,
+    authenticated: true,
   };
   let mut wire = [0; 8];
   let (sent, received) =
@@ -67,6 +70,9 @@ async fn empty_data_and_large_escaped_payload_have_exact_wire_representation() {
     machine: &mut machine,
     state: &mut state,
     deadline: Instant::now() + Duration::from_secs(1),
+    options: &ServerOptions::default(),
+    peer: None,
+    authenticated: true,
   };
   let payload = vec![b'%'; 700];
   // 997 payload bytes per line allow 332 complete three-byte escapes.
@@ -95,6 +101,9 @@ async fn cancellation_after_partial_write_closes_channel_and_invalidates_state()
       machine: &mut machine,
       state: &mut state,
       deadline: Instant::now() + Duration::from_secs(1),
+      options: &ServerOptions::default(),
+      peer: None,
+      authenticated: true,
     };
     let mut send = Box::pin(context.send_data(b"secret"));
     assert!(matches!(send.as_mut().poll(&mut Context::from_waker(Waker::noop())), Poll::Pending));
@@ -118,6 +127,9 @@ async fn expired_total_deadline_closes_channel() {
     machine: &mut machine,
     state: &mut state,
     deadline: Instant::now() + Duration::from_secs(1),
+    options: &ServerOptions::default(),
+    peer: None,
+    authenticated: true,
   };
   assert!(matches!(
     context.send_data(b"payload").await,
@@ -140,6 +152,9 @@ async fn illegal_output_closes_without_sending_and_debug_hides_state() {
     machine: &mut machine,
     state: &mut state,
     deadline: Instant::now() + Duration::from_secs(1),
+    options: &ServerOptions::default(),
+    peer: None,
+    authenticated: true,
   };
   assert_eq!(context.state(), "SECRET_MARKER");
   assert!(!format!("{context:?}").contains("SECRET_MARKER"));
@@ -161,8 +176,60 @@ async fn dropping_unpolled_send_preserves_session() {
     machine: &mut machine,
     state: &mut state,
     deadline: Instant::now() + Duration::from_secs(1),
+    options: &ServerOptions::default(),
+    peer: None,
+    authenticated: true,
   };
   drop(context.send_data(b"unused"));
   context.send_data(b"ok").await.unwrap();
+  assert_eq!(machine.state(), ServerState::Handler);
+}
+#[tokio::test]
+async fn cancelled_inquiry_request_write_invalidates_even_without_a_returned_guard() {
+  let (local, mut peer) = tokio::io::duplex(1);
+  let mut channel = Channel::new(Stream::new(local));
+  let mut machine = machine();
+  let mut state = ();
+  {
+    let mut context = CommandContext {
+      channel: &mut channel,
+      machine: &mut machine,
+      state: &mut state,
+      deadline: Instant::now() + Duration::from_secs(1),
+      options: &ServerOptions::default(),
+      peer: None,
+      authenticated: true,
+    };
+    let mut request = Box::pin(context.inquire("SECRET_MARKER", b"", Sensitivity::Secret));
+    assert!(request.as_mut().poll(&mut Context::from_waker(Waker::noop())).is_pending());
+    drop(request);
+    assert!(context.send_data(b"retry").await.is_err());
+  }
+  assert_eq!(machine.state(), ServerState::Invalid);
+  let mut bytes = Vec::new();
+  peer.read_to_end(&mut bytes).await.unwrap();
+  assert_eq!(bytes, b"I");
+}
+
+#[tokio::test]
+async fn unpolled_inquiry_is_harmless_and_status_preserves_the_phase() {
+  let (local, mut peer) = tokio::io::duplex(128);
+  let mut channel = Channel::new(Stream::new(local));
+  let mut machine = machine();
+  let mut state = ();
+  let mut context = CommandContext {
+    channel: &mut channel,
+    machine: &mut machine,
+    state: &mut state,
+    deadline: Instant::now() + Duration::from_secs(1),
+    options: &ServerOptions::default(),
+    peer: None,
+    authenticated: true,
+  };
+  drop(context.inquire("UNUSED", b"", Sensitivity::Secret));
+  context.send_status("PROGRESS", b"1").await.unwrap();
+  let mut bytes = [0; 13];
+  peer.read_exact(&mut bytes).await.unwrap();
+  assert_eq!(&bytes, b"S PROGRESS 1\n");
   assert_eq!(machine.state(), ServerState::Handler);
 }

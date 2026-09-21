@@ -1,11 +1,11 @@
 use std::fmt;
 
 use assuan_protocol::{LineKind, MAX_LINE_BYTES, Sensitivity, ServerMachine, encode_data_chunk};
-use assuan_transport::Channel;
+use assuan_transport::{Channel, PeerIdentity};
 use tokio::time::Instant;
 use zeroize::{Zeroize, Zeroizing};
 
-use crate::HandlerError;
+use crate::{HandlerError, ServerInquiry, ServerOptions};
 
 /// Exclusive access to one invocation's channel and session-local state.
 ///
@@ -17,9 +17,95 @@ pub struct CommandContext<'io, S: Send + 'static = ()> {
   pub(crate) machine: &'io mut ServerMachine,
   pub(crate) state: &'io mut S,
   pub(crate) deadline: Instant,
+  pub(crate) options: &'io ServerOptions,
+  pub(crate) peer: Option<&'io PeerIdentity>,
+  pub(crate) authenticated: bool,
 }
 
 impl<S: Send + 'static> CommandContext<'_, S> {
+  /// Borrows transport-supplied OS identity, absent for TCP.
+  #[must_use]
+  pub fn peer(&self) -> Option<&PeerIdentity> {
+    return self.peer;
+  }
+
+  /// Reports whether the session's authentication hook has already succeeded.
+  ///
+  /// This stays true across RESET; it does not imply that `DefaultHooks`
+  /// performed application authentication.
+  #[must_use]
+  pub const fn is_authenticated(&self) -> bool {
+    return self.authenticated;
+  }
+
+  /// Requests client data with classification selected before any data is read.
+  ///
+  /// The exclusive guard must consume END or CAN and finish before this
+  /// context is reused. Its deadline is the smaller of the remaining command
+  /// budget and the inquiry timeout.
+  ///
+  /// # Errors
+  /// Encoding, state, write, or timeout failures invalidate the session.
+  /// Cancellation after polling closes the channel.
+  ///
+  /// # Panics
+  /// Requires a Tokio runtime with time enabled.
+  pub async fn inquire(
+    &mut self,
+    keyword: &str,
+    args: &[u8],
+    sensitivity: Sensitivity,
+  ) -> Result<ServerInquiry<'_>, HandlerError> {
+    let deadline = Instant::now()
+      .checked_add(self.options.inquiry_timeout)
+      .unwrap_or(self.deadline)
+      .min(self.deadline);
+    return ServerInquiry::begin(
+      self.channel,
+      self.machine,
+      deadline,
+      self.options.max_inquiry_bytes,
+      assuan_protocol::ServerLine::Inquire {
+        keyword,
+        args,
+      },
+      sensitivity,
+    )
+    .await;
+  }
+
+  /// Sends informational status without completing the command.
+  ///
+  /// # Errors
+  /// Invalid fields, state, I/O failure or cancellation invalidate the channel.
+  ///
+  /// # Panics
+  /// Requires a Tokio runtime with time enabled.
+  pub async fn send_status(&mut self, keyword: &str, args: &[u8]) -> Result<(), HandlerError> {
+    let mut operation = IoOperation {
+      channel: self.channel,
+      machine: self.machine,
+      complete: false,
+    };
+    let mut output = Box::new(Zeroizing::new([0; MAX_LINE_BYTES]));
+    let len = assuan_protocol::encode_response(
+      assuan_protocol::ServerLine::Status {
+        keyword,
+        args,
+      },
+      &mut output,
+    )
+    .map_err(HandlerError::Protocol)?;
+    operation.machine.send_response(LineKind::Status).map_err(HandlerError::State)?;
+    operation
+      .channel
+      .write_line(&output[..len], self.deadline, Sensitivity::Secret)
+      .await
+      .map_err(HandlerError::Transport)?;
+    operation.complete = true;
+    return Ok(());
+  }
+
   /// Borrows application state owned by this session.
   #[must_use]
   pub fn state(&self) -> &S {
@@ -51,7 +137,7 @@ impl<S: Send + 'static> CommandContext<'_, S> {
   /// # Panics
   /// Requires a Tokio runtime with time enabled.
   pub async fn send_data(&mut self, data: &[u8]) -> Result<(), HandlerError> {
-    let mut operation = SendOperation {
+    let mut operation = IoOperation {
       channel: self.channel,
       machine: self.machine,
       complete: false,
@@ -84,13 +170,13 @@ impl<S: Send + 'static> fmt::Debug for CommandContext<'_, S> {
   }
 }
 
-struct SendOperation<'a> {
-  channel: &'a mut Channel,
-  machine: &'a mut ServerMachine,
-  complete: bool,
+pub(crate) struct IoOperation<'a> {
+  pub channel: &'a mut Channel,
+  pub machine: &'a mut ServerMachine,
+  pub complete: bool,
 }
 
-impl Drop for SendOperation<'_> {
+impl Drop for IoOperation<'_> {
   fn drop(&mut self) {
     if !self.complete {
       self.machine.invalidate();

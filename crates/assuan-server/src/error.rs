@@ -54,6 +54,9 @@ pub enum HandlerError {
   /// The operation is not legal in the current protocol state.
   #[error("handler state failure")]
   State(#[source] StateError),
+  /// A decoded inquiry exceeded its configured byte budget.
+  #[error("handler resource limit exceeded")]
+  Limit(#[source] assuan_protocol::LimitError),
 }
 
 impl HandlerError {
@@ -114,6 +117,39 @@ impl fmt::Debug for HandlerError {
       Self::Transport(_) => f.write_str("Transport { .. }"),
       Self::Protocol(_) => f.write_str("Protocol { .. }"),
       Self::State(_) => f.write_str("State { .. }"),
+      Self::Limit(_) => f.write_str("Limit { .. }"),
     };
   }
 }
+
+/// Terminal session failures. Diagnostics never include application payloads.
+///
+/// Explicit error sources may expose application-supplied I/O details; redact
+/// those before logging. Ordinary remote command errors are sent to the peer
+/// and do not end a session.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum ServerError {
+  /// Channel I/O, framing, or an operation deadline failed.
+  #[error("server transport failure")]
+  Transport(#[from] TransportError),
+  /// Wire encoding or parsing failed.
+  #[error("server protocol failure")]
+  Protocol(#[from] ProtocolError),
+  /// The session is incomplete or unusable.
+  #[error("server state failure")]
+  State(#[from] StateError),
+  /// A fatal handler operation, authentication, or the close hook failed.
+  #[error("server handler or hook failure")]
+  Handler(#[source] HandlerError),
+  /// Options have a zero limit or an unrepresentable deadline.
+  #[error("invalid server options")]
+  InvalidOptions,
+}
+
+// Numeric codes from libgpg-error src/err-codes.h.in:
+// https://github.com/gpg/libgpg-error/blob/master/src/err-codes.h.in
+pub(crate) const INTERNAL: u32 = 63;
+pub(crate) const UNKNOWN_OPTION: u32 = 174;
+pub(crate) const UNKNOWN_COMMAND: u32 = 175;
+pub(crate) const INVALID_VALUE: u32 = 55;

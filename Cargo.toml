@@ -18,6 +18,7 @@ categories = ["network-programming", "parser-implementations"]
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
 thiserror = { version = "2", default-features = false }
 tokio = "1"
+log = "0.4"
 proptest = "1"
 trybuild = "1"
 

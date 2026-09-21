@@ -140,3 +140,28 @@ async fn expired_deadline_prevents_immediately_ready_io() {
     Err(assuan_transport::TransportError::Timeout)
   ));
 }
+#[tokio::test]
+async fn optional_eof_distinguishes_boundary_from_truncation_with_read_ahead() {
+  for suffix in [b"".as_slice(), b"incomplete"] {
+    let (io, mut peer) = tokio::io::duplex(128);
+    peer.write_all(b"FIRST\n").await.unwrap();
+    peer.write_all(suffix).await.unwrap();
+    drop(peer);
+    let mut channel = Channel::new(Stream::new(io));
+    assert_eq!(
+      channel.read_line_or_eof(deadline(), Sensitivity::Secret).await.unwrap().as_deref(),
+      Some(b"FIRST".as_slice())
+    );
+    let result = channel.read_line_or_eof(deadline(), Sensitivity::Secret).await;
+    if suffix.is_empty() {
+      assert!(result.unwrap().is_none());
+    } else {
+      assert!(matches!(
+        result,
+        Err(assuan_transport::TransportError::Protocol(
+          assuan_protocol::ProtocolError::UnexpectedEof
+        ))
+      ));
+    }
+  }
+}
