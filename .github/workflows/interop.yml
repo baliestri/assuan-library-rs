@@ -45,11 +45,22 @@ jobs:
         timeout-minutes: 4
         shell: pwsh
         run: |
-          choco install gnupg --yes --no-progress
+          $ErrorActionPreference = 'Stop'
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+          $scoopRoot = Join-Path $env:RUNNER_TEMP 'assuan-scoop'
+          $installer = Join-Path $env:RUNNER_TEMP 'install-scoop.ps1'
+          Invoke-WebRequest -Uri 'https://get.scoop.sh' -OutFile $installer
+          & $installer -RunAsAdmin -ScoopDir $scoopRoot
+          if ($LASTEXITCODE -ne 0) { throw 'Scoop installation failed' }
+          $scoop = Join-Path $scoopRoot 'shims\scoop.ps1'
+          & $scoop install main/gnupg
           if ($LASTEXITCODE -ne 0) { throw 'GnuPG installation failed' }
-          $candidates = @("${env:ProgramFiles(x86)}\GnuPG\bin", "$env:ProgramFiles\GnuPG\bin")
-          $bin = $candidates | Where-Object { Test-Path -LiteralPath (Join-Path $_ 'gpgconf.exe') } | Select-Object -First 1
-          if (-not $bin) { throw 'Native GnuPG executables were not found' }
+          $bin = Join-Path $scoopRoot 'apps\gnupg\current\bin'
+          foreach ($tool in 'gpgconf.exe', 'gpg-connect-agent.exe', 'gpg-agent.exe') {
+            if (-not (Test-Path -LiteralPath (Join-Path $bin $tool) -PathType Leaf)) {
+              throw "Required GnuPG executable was not found: $tool"
+            }
+          }
           "ASSUAN_GPGCONF=$(Join-Path $bin 'gpgconf.exe')" >> $env:GITHUB_ENV
           "ASSUAN_GPG_CONNECT_AGENT=$(Join-Path $bin 'gpg-connect-agent.exe')" >> $env:GITHUB_ENV
       - name: Test independent peers and isolated agent
