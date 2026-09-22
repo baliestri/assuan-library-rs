@@ -119,3 +119,13 @@ server.serve(listener, shutdown).await?;
 Accept errors stop serving and are returned after draining existing sessions.
 Transport-specific filesystem cleanup remains explicit: dropping a Unix
 listener closes its socket but does not unlink its pathname.
+
+## Platform, feature and security boundaries
+
+Requires std and Tokio, with no optional public features. Standard backends support TCP on Windows/Linux/macOS, Unix sockets on Unix, and named pipes on Windows. `Server::serve` also accepts custom `Acceptor` implementations. Default hooks add no application authentication; configure authorization, resource limits and shutdown behavior for your service.
+
+See the [security guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/security.md) for storage, cancellation and transport guarantees, and the [package guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/publishing.md) for local verification and release prerequisites.
+
+## License
+
+MIT. See `LICENSE.md` in this package.

@@ -12,6 +12,10 @@ keywords.workspace = true
 categories.workspace = true
 readme = "README.md"
 
+[package.metadata.docs.rs]
+features = []
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "aarch64-apple-darwin"]
+
 [dependencies]
 tokio = { workspace = true, features = ["net", "io-util", "time", "rt", "process", "macros"] }
 thiserror.workspace = true

@@ -32,6 +32,12 @@ protecting sensitive data.
 
 Use `Sexpr::to_owned` to copy atoms and list structure into an `OwnedSexpr` that outlives the input. `to_canonical` produces canonical bytes; `write_canonical` appends them to an existing vector. Encoding applies the default parsing limits, including to manually constructed trees. The output byte limit includes existing bytes when appending. Failures leave output contents and length unchanged. These owned values and output buffers are ordinary memory, not secret storage.
 
+## Platform, feature and security boundaries
+
+The default `std` feature can be disabled for `no_std` with `alloc`. Parsing and encoding are platform-independent and need no Tokio runtime. Borrowed atoms retain the input lifetime; converting to `OwnedSexpr` copies bytes into ordinary memory. Redacted diagnostics do not turn owned memory into protected storage.
+
+See the [security guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/security.md) for storage, cancellation and transport guarantees, and the [package guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/publishing.md) for local verification and release prerequisites.
+
 ## License
 
 MIT. See [LICENSE.md](LICENSE.md).

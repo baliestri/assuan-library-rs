@@ -63,6 +63,9 @@ impl Listener {
   ///
   /// TCP does not apply the local-user policy: it has no OS peer credentials.
   /// Port zero is replaced by the actual bound port in [`Self::endpoint`].
+  /// No Assuan session exists during binding. Cancelling a pending bind drops
+  /// any socket owned by that future. Local IPC binding completes synchronously
+  /// when polled; dropping a returned Unix listener does not unlink its path.
   ///
   /// # Errors
   /// Returns [`TransportError::Io`] if binding or querying the socket fails, or

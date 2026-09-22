@@ -30,6 +30,15 @@ crates, so mixing the facade with direct dependencies preserves type identity.
 
 ## Public commands and protected buffers
 
+Constructing a borrowed command needs no connection or external service:
+
+```rust
+use assuan_library::Command;
+let command = Command::new("GETINFO", b"version")?;
+assert_eq!(command.args(), b"version");
+# Ok::<(), assuan_library::protocol::ProtocolError>(())
+```
+
 ```rust
 use assuan_library::{Command, SecretBytes};
 
@@ -109,4 +118,14 @@ Servers default to 128 concurrent sessions and a shared 30-second shutdown
 grace period, after which remaining tasks are aborted and joined. Configure
 operation deadlines, inquiry limits and collection limits for the application.
 Diagnostics omit payloads; the examples print completion and byte counts.
-Independent interoperability with real `GnuPG` remains a separate test stage.
+Independent interoperability with real `GnuPG` is validated in a separate workflow on Windows, Linux and macOS.
+
+## Platform, feature and security boundaries
+
+Requires std and Tokio. Choose a standard endpoint with `Client::connect` and `Listener::bind`, or wrap connected I/O with `Stream::new` and implement `Acceptor` for server acceptance. `Stream` belongs to this library; its I/O traits come from Tokio. Custom backends need neither `GnuPG` nor a new `Endpoint` variant. Optional peer identity must reflect actual authentication. Connection setup and acceptance belong to the backend, framing to `Channel`, and command sequencing to client/server. An owned stdin/stdout adapter can implement the same traits; keep application logs off its protocol output. See the [complete custom transport example](https://github.com/baliestri/assuan-library-rs/blob/develop/crates/assuan-library/examples/custom_transport.rs).
+
+See the [security guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/security.md) for storage, cancellation and transport guarantees, and the [package guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/publishing.md) for local verification and release prerequisites.
+
+## License
+
+MIT. See `LICENSE.md` in this package.

@@ -192,6 +192,12 @@ The wrapper does not wipe caller buffers or OS buffers. Session ownership,
 transaction cancellation, framing, and sensitive-data handling belong to higher
 layers. Dropping a stream drops its transport; no background drain is spawned.
 
+## Platform, feature and security boundaries
+
+Requires std and Tokio. TCP is available on Windows, Linux and macOS; Unix sockets and Windows named pipes are gated by their target OS. The optional `test-fixtures` feature builds a synthetic discovery executable; it is not needed by applications or enabled in docs.rs. Wrapping custom I/O adds neither authentication nor encryption.
+
+See the [security guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/security.md) for storage, cancellation and transport guarantees, and the [package guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/publishing.md) for local verification and release prerequisites.
+
 ## License
 
 MIT. See `LICENSE.md` in this package.

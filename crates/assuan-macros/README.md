@@ -112,3 +112,13 @@ The generated implementation uses std and resolves server/protocol paths
 through the facade when present, otherwise through direct dependencies.
 Direct consumers are compiled in this crate's tests; facade consumers,
 renamed dependencies and compile-fail contracts are tested by assuan-library.
+
+## Platform, feature and security boundaries
+
+Procedural macros execute on the compilation host and have no optional public features. Generated code uses the selected protocol/server APIs on the target platform. Literals are embedded in binaries and may appear in compiler errors; never put real secrets in them.
+
+See the [security guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/security.md) for storage, cancellation and transport guarantees, and the [package guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/publishing.md) for local verification and release prerequisites.
+
+## License
+
+MIT. See `LICENSE.md` in this package.

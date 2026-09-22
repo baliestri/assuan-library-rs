@@ -91,6 +91,8 @@ impl<'a> ServerInquiry<'a> {
   /// None means END or CAN was received; call finish to obtain which one.
   /// Repeated calls after None do not read more input. Empty D lines yield an
   /// empty payload. The byte budget counts decoded bytes across all segments.
+  /// The returned payload borrows this inquiry and must be released before
+  /// another read or finish can reuse its receive storage.
   ///
   /// # Errors
   /// Invalid input, EOF, timeout, or a byte-limit failure closes the channel.

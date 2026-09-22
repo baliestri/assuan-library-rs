@@ -4,7 +4,7 @@ A Rust implementation of the [Assuan protocol](https://gnupg.org/documentation/m
 
 ## Project status
 
-All seven crates are implemented. The facade exposes borrowed protocol types, protected buffers, streaming client transactions and inquiries, typed server handlers and hooks, bounded concurrent serving, canonical S-expressions, and compile-validated macros. TCP, Unix sockets, Windows named pipes and application-defined byte transports are supported on their respective platforms. Native agent discovery does not launch services. Independent interoperability tests with real GnuPG are the next development stage; no package has been published.
+All seven crates are implemented. The facade exposes borrowed protocol types, protected buffers, streaming client transactions and inquiries, typed server handlers and hooks, bounded concurrent serving, canonical S-expressions, and compile-validated macros. TCP, Unix sockets, Windows named pipes and application-defined byte transports are supported on their respective platforms. Native agent discovery does not launch services. Independent interoperability tests with real GnuPG pass on Windows, Linux and macOS. No package has been published.
 
 ## Workspace design
 
@@ -68,6 +68,15 @@ checks Cargo aliases:
 cargo test -p assuan-library --all-features
 cargo check --manifest-path crates/assuan-library/tests/fixtures/renamed/Cargo.toml
 ```
+
+## Security and package verification
+
+Read the [security and ownership guide](docs/security.md) before exchanging secrets.
+The [publishing guide](docs/publishing.md) describes local verification of all seven
+archives and the prerequisites for a future release. Run `./scripts/verify-packages.ps1`
+from a clean checkout after approved commits; it does not publish packages.
+See [CI coverage](docs/continuous-integration.md) and
+[protocol compatibility](docs/protocol-compatibility.md) for the tested matrix.
 
 ## License
 

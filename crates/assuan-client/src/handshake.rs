@@ -39,6 +39,9 @@ pub struct Handshake {
 impl Handshake {
   /// Reads the next greeting event under the original greeting deadline.
   ///
+  /// The event borrows this handshake until released, preventing another
+  /// mutable operation while its receive-buffer views remain in use.
+  ///
   /// # Errors
   /// Reports invalid options deferred from construction, rejected greeting,
   /// malformed responses, forgotten inquiries, timeout, or uncertain I/O.

@@ -109,6 +109,19 @@ not yet implemented. Receiving an inquiry currently closes the connection with
 Use `Client::handshake` when the peer may issue an inquiry before its greeting. `Inquiry` is exclusive: data is sent as escaped `D` lines, `finish` sends `END`, and `cancel` sends `CAN` while the enclosing operation still consumes its final response. A forgotten inquiry invalidates the session. `send_secret` accepts an explicit `SecretRef`, uses protected scratch storage, and counts decoded bytes against `ClientOptions::max_inquiry_bytes`.
 
 `Client::from_stream` and `Client::connect` cancel an inquiry automatically when no callback is supplied, then wait for the peer's final response. For callbacks, implement `GreetingHandler` and use `Client::connect_with`. Callback failure, inquiry timeout, partial writes, and cancellation close the connection. Inquiry timeouts are bounded by both `inquiry_timeout` and the enclosing greeting or command deadline.
+## Platform, feature and security boundaries
+
+Requires std and Tokio. TCP works on Windows, Linux and macOS; Unix sockets
+and Windows named pipes are selected with platform-specific endpoints. This
+crate has no optional public features. Streaming avoids retained response
+copies; collection defaults to 16 MiB and 4096 events. `collect_secret` protects
+data only: collected status fields and comments remain ordinary memory.
+
+See the [security guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/security.md)
+for storage, cancellation and transport guarantees, and the
+[package guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/publishing.md)
+for local verification and release prerequisites.
+
 ## License
 
 MIT. See `LICENSE.md` in this package.

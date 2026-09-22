@@ -26,6 +26,10 @@ pub struct Stream {
 
 impl Stream {
   /// Takes ownership of any compatible stream, without reading or writing it.
+  ///
+  /// The `'static` bound forbids borrowing short-lived external handles; it
+  /// does not require the stream to live forever. Owned input/output adapters
+  /// can implement the I/O traits and use this same constructor.
   #[must_use]
   pub fn new<T: IoStream + 'static>(stream: T) -> Self {
     return Self {

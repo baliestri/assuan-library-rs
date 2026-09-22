@@ -125,6 +125,12 @@ invalidate after failed, partial, or cancelled I/O. Server response transitions
 are checked before sending; a failed send must invalidate even if the transition
 reached Ready. These machines do not close transports or implement timeout logic.
 
+## Platform, feature and security boundaries
+
+The default `std` feature can be disabled for `no_std` with `alloc`. Protocol logic is platform-independent and performs no I/O. Borrowed commands and server lines cannot outlive their input; the caller owns decoding and output buffers. Higher layers enforce deadlines and transport closure after uncertain I/O.
+
+See the [security guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/security.md) for storage, cancellation and transport guarantees, and the [package guide](https://github.com/baliestri/assuan-library-rs/blob/develop/docs/publishing.md) for local verification and release prerequisites.
+
 ## License
 
 MIT. See `LICENSE.md` in this package.
