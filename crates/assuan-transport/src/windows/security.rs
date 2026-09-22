@@ -51,7 +51,24 @@ mod tests {
     let serialized = descriptor
       .serialize(0x0000_0001 | 0x0000_0004, |value| return value.to_string_lossy())
       .unwrap();
-    assert_eq!(serialized, format!("O:{sid}D:P(A;;GA;;;{sid})"));
+    // Windows may serialize numeric SIDs using SDDL aliases (e.g. LA on CI).
+    // Normalize only the expected owner; still require exactly one protected
+    // allow ACE with full access for that same identity.
+    let owner = SecurityDescriptor::deserialize(&U16CString::from_str(format!("O:{sid}")).unwrap())
+      .unwrap()
+      .serialize(0x0000_0001, |value| return value.to_string_lossy())
+      .unwrap();
+    let trustee = owner.strip_prefix("O:").unwrap();
+    assert_eq!(serialized, format!("{owner}D:P(A;;GA;;;{trustee})"));
+  }
+
+  #[test]
+  fn well_known_sid_serialization_preserves_the_exact_access_policy() {
+    let descriptor = descriptor_for_sid("S-1-5-18").unwrap();
+    let serialized = descriptor
+      .serialize(0x0000_0001 | 0x0000_0004, |value| return value.to_string_lossy())
+      .unwrap();
+    assert_eq!(serialized, "O:SYD:P(A;;GA;;;SY)");
   }
 
   #[test]

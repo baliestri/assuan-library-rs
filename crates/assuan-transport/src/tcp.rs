@@ -60,6 +60,21 @@ mod tests {
   use super::*;
 
   #[tokio::test(start_paused = true)]
+  async fn refused_connection_retains_a_typed_io_cause() {
+    let start = Instant::now();
+    let error = within_deadline::<()>(&ConnectOptions::default(), async {
+      return Err(std::io::Error::from(std::io::ErrorKind::ConnectionRefused).into());
+    })
+    .await
+    .unwrap_err();
+    let TransportError::Io(cause) = error else {
+      panic!("expected I/O failure");
+    };
+    assert_eq!(cause.kind(), std::io::ErrorKind::ConnectionRefused);
+    assert_eq!(Instant::now(), start);
+  }
+
+  #[tokio::test(start_paused = true)]
   async fn pending_attempt_expires_at_total_deadline() {
     let start = Instant::now();
     let result = within_deadline::<()>(&ConnectOptions::default(), pending()).await;
