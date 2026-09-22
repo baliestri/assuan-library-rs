@@ -1,3 +1,5 @@
+use std::fmt;
+
 use assuan_protocol::{Command, PayloadRef, SecretBytes, SecretRef, Sensitivity};
 
 use crate::{ClientError, Event, Transaction};
@@ -47,7 +49,6 @@ impl CollectLimits {
 }
 
 /// A bounded public response collected from one completed transaction.
-#[derive(Debug)]
 pub struct Response {
   data: Vec<u8>,
   statuses: Vec<(String, Vec<u8>)>,
@@ -75,7 +76,6 @@ impl Response {
 }
 
 /// A bounded response whose data remains in protected storage.
-#[derive(Debug)]
 pub struct SecretResponse {
   data: SecretBytes,
   statuses: Vec<(String, Vec<u8>)>,
@@ -105,8 +105,19 @@ impl SecretResponse {
 impl crate::Client {
   /// Collects a bounded public response, cancelling inquiries automatically.
   ///
+  /// Copies data, status fields, and comments into ordinary growable storage.
+  /// Limits bound retained bytes and observed events, not allocator overhead.
+  /// Returned views borrow the response. Default limits are 16 MiB and 4096
+  /// events. Use streaming transactions to avoid retaining the whole response.
+  /// Cancelling after I/O starts prevents session reuse; abandoning an active
+  /// transaction closes it. A completed remote ERR preserves reuse. Inquiry
+  /// CAN still requires the server's final response. No background drain runs.
+  ///
   /// # Errors
   /// Returns protocol, transport, inquiry, or retention-limit failures.
+  ///
+  /// # Panics
+  /// Requires a Tokio runtime with time enabled.
   pub async fn collect(
     &mut self,
     command: Command<'_>,
@@ -124,8 +135,18 @@ impl crate::Client {
   /// Collects a bounded response in protected storage, cancelling inquiries
   /// automatically.
   ///
+  /// Allocates fixed protected data storage of `limits.max_bytes()` before
+  /// receiving data. Data is copied directly from the borrowed receive buffer;
+  /// status fields and comments remain ordinary owned memory. Do not use this
+  /// collector when those metadata fields contain secrets; stream them instead.
+  /// Returned views borrow the response. Retention limits and cancellation
+  /// behavior are the same as [`Self::collect`].
+  ///
   /// # Errors
   /// Returns protocol, transport, inquiry, or retention-limit failures.
+  ///
+  /// # Panics
+  /// Requires a Tokio runtime with time enabled.
   pub async fn collect_secret(
     &mut self,
     command: Command<'_>,
@@ -152,7 +173,11 @@ async fn collect_transaction(
   secret: bool,
 ) -> Result<Collected, ClientError> {
   let mut data = Vec::new();
-  let mut secret_data = SecretBytes::with_capacity(limits.max_bytes)?;
+  let mut secret_data = SecretBytes::with_capacity(if secret {
+    limits.max_bytes
+  } else {
+    0
+  })?;
   let mut statuses = Vec::new();
   let mut comments = Vec::new();
   let mut events = 0usize;
@@ -173,7 +198,13 @@ async fn collect_transaction(
         inquiry.cancel().await?;
       }
       Event::Data(payload) => {
-        append_payload(payload, secret, limits.max_bytes, &mut data, &mut secret_data)?;
+        let bytes = payload_slice(&payload);
+        ensure_room(bytes.len(), &data, &secret_data, &statuses, &comments, limits.max_bytes)?;
+        if secret {
+          secret_data.extend_from_slice(bytes)?;
+        } else {
+          data.extend_from_slice(bytes);
+        }
       }
       Event::Status {
         keyword,
@@ -187,7 +218,7 @@ async fn collect_transaction(
           .checked_add(1)
           .ok_or(ClientError::Limit(assuan_protocol::LimitError::LengthOverflow))?;
         ensure_room(bytes, &data, &secret_data, &statuses, &comments, limits.max_bytes)?;
-        statuses.push((keyword.to_owned(), payload_bytes(args)));
+        statuses.push((keyword.to_owned(), payload_slice(&args).to_vec()));
       }
       Event::Comment(payload) => {
         ensure_room(
@@ -198,7 +229,7 @@ async fn collect_transaction(
           &comments,
           limits.max_bytes,
         )?;
-        comments.push(payload_bytes(payload));
+        comments.push(payload_slice(&payload).to_vec());
       }
       Event::End => {}
       Event::Finished {
@@ -226,27 +257,10 @@ async fn collect_transaction(
   }));
 }
 
-fn append_payload(
-  payload: PayloadRef<'_>,
-  secret: bool,
-  limit: usize,
-  data: &mut Vec<u8>,
-  secret_data: &mut SecretBytes,
-) -> Result<(), ClientError> {
-  let bytes = payload_bytes(payload);
-  ensure_data_room(bytes.len(), data, secret_data, limit)?;
-  if secret {
-    secret_data.extend_from_slice(&bytes)?;
-  } else {
-    data.extend_from_slice(&bytes);
-  }
-  return Ok(());
-}
-
-fn payload_bytes(payload: PayloadRef<'_>) -> Vec<u8> {
+fn payload_slice<'a>(payload: &'a PayloadRef<'_>) -> &'a [u8] {
   return match payload {
-    PayloadRef::Public(bytes) => bytes.to_vec(),
-    PayloadRef::Secret(secret) => secret.expose().to_vec(),
+    PayloadRef::Public(bytes) => bytes,
+    PayloadRef::Secret(secret) => secret.expose(),
   };
 }
 fn payload_len_ref(payload: &PayloadRef<'_>) -> usize {
@@ -254,22 +268,6 @@ fn payload_len_ref(payload: &PayloadRef<'_>) -> usize {
     PayloadRef::Public(bytes) => bytes.len(),
     PayloadRef::Secret(secret) => secret.expose().len(),
   };
-}
-fn ensure_data_room(
-  add: usize,
-  data: &[u8],
-  secret: &SecretBytes,
-  limit: usize,
-) -> Result<(), ClientError> {
-  if data
-    .len()
-    .checked_add(secret.len())
-    .and_then(|n| return n.checked_add(add))
-    .is_none_or(|n| return n > limit)
-  {
-    return Err(ClientError::Limit(assuan_protocol::LimitError::CapacityExceeded));
-  }
-  return Ok(());
 }
 fn ensure_room(
   add: usize,
@@ -287,4 +285,26 @@ fn ensure_room(
     return Err(ClientError::Limit(assuan_protocol::LimitError::CapacityExceeded));
   }
   return Ok(());
+}
+
+impl fmt::Debug for Response {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    return f
+      .debug_struct("Response")
+      .field("data_bytes", &self.data.len())
+      .field("status_count", &self.statuses.len())
+      .field("comment_count", &self.comments.len())
+      .finish_non_exhaustive();
+  }
+}
+
+impl fmt::Debug for SecretResponse {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    return f
+      .debug_struct("SecretResponse")
+      .field("data_bytes", &self.data.len())
+      .field("status_count", &self.statuses.len())
+      .field("comment_count", &self.comments.len())
+      .finish_non_exhaustive();
+  }
 }

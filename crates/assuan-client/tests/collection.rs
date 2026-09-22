@@ -86,3 +86,59 @@ async fn public_and_secret_command_classification_are_selected_before_send() {
   tx.finish().unwrap();
   let _ = SecretRef::new(b"caller-owned");
 }
+
+#[tokio::test]
+async fn metadata_before_data_counts_toward_both_collection_limits() {
+  for secret in [false, true] {
+    for wire in [b"S INFO x\nD abc\nOK\n".as_slice(), b"# abcde\nD abc\nOK\n"] {
+      let (mut client, mut peer) = ready().await;
+      peer.write_all(wire).await.unwrap();
+      let command = Command::new("NOP", b"").unwrap();
+      let limits = CollectLimits::new(8, 10).unwrap();
+      let error = if secret {
+        client.collect_secret(command, limits).await.unwrap_err()
+      } else {
+        client.collect(command, limits).await.unwrap_err()
+      };
+      assert!(matches!(error, ClientError::Limit(_)));
+      assert!(!client.is_usable());
+    }
+  }
+}
+
+#[tokio::test]
+async fn collected_metadata_debug_is_redacted() {
+  for secret in [false, true] {
+    let (mut client, mut peer) = ready().await;
+    peer.write_all(b"S PRIVATE sensitive\n# sensitive\nD sensitive\nOK\n").await.unwrap();
+    let command = Command::new("NOP", b"").unwrap();
+    let limits = CollectLimits::new(64, 8).unwrap();
+    let debug = if secret {
+      format!("{:?}", client.collect_secret(command, limits).await.unwrap())
+    } else {
+      format!("{:?}", client.collect(command, limits).await.unwrap())
+    };
+    assert!(!debug.contains("PRIVATE"));
+    assert!(!debug.contains("sensitive"));
+    assert!(!debug.contains("115, 101, 110"));
+    assert!(debug.contains("status_count: 1"));
+  }
+}
+
+#[tokio::test]
+async fn interleaved_metadata_and_data_accept_exact_retention_budget() {
+  for secret in [false, true] {
+    let (mut client, mut peer) = ready().await;
+    peer.write_all(b"D a\nS I x\n#z\nD bc\nOK\n").await.unwrap();
+    let command = Command::new("NOP", b"").unwrap();
+    let limits = CollectLimits::new(7, 5).unwrap();
+    if secret {
+      let response = client.collect_secret(command, limits).await.unwrap();
+      assert_eq!(response.data().expose(), b"abc");
+    } else {
+      let response = client.collect(command, limits).await.unwrap();
+      assert_eq!(response.data(), b"abc");
+    }
+    assert!(client.is_usable());
+  }
+}
