@@ -123,9 +123,12 @@ Local validation on 2026-09-21:
 | --- | --- | --- |
 | Linux, Docker `rust:1.98.1` | 2.4.7 | Real agent, raw Unix socket server, literal TCP passed |
 | Windows, portable Scoop | 2.5.22 | Real agent via TCP/nonce, named-pipe server, literal TCP passed using short tool paths |
-| macOS | Not executed locally | Pending CI execution |
+| macOS | Not executed locally | See hosted validation below |
 
 `.github/workflows/interop.yml` installs GnuPG explicitly on isolated Linux,
 macOS, and Windows runners and requires all applicable interoperability tests.
-The presence of a job does not mean that platform has been validated; hosted
-workflow execution remains pending until pushed and run.
+Hosted [run 35666453491](https://github.com/baliestri/assuan-library-rs/actions/runs/35666453491)
+passed on all three platforms: Ubuntu with GnuPG 2.4.4, macOS with 2.5.22, and
+Windows with Scoop GnuPG 2.5.22. Windows installs the portable package by
+extraction, avoiding the native installer timeout observed with Chocolatey.
+These results cover the interoperability workflow, not the later full CI matrix.

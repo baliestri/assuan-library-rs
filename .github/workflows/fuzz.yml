@@ -1,0 +1,53 @@
+name: Fuzz smoke tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [sexpr, wire, states]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install fuzz toolchain
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo +nightly install cargo-fuzz --locked
+          rustc +nightly --version --verbose
+          cargo +nightly fuzz --version
+      - name: Resolve fuzz dependencies
+        run: |
+          cargo +nightly generate-lockfile --manifest-path fuzz/Cargo.toml
+          cargo +nightly fetch --locked --manifest-path fuzz/Cargo.toml
+      - name: Seed writable corpus
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p "fuzz/corpus/$TARGET"
+          cp "fuzz/seeds/$TARGET/"* "fuzz/corpus/$TARGET/"
+      - name: Run bounded fuzz smoke test
+        env:
+          TARGET: ${{ matrix.target }}
+          CARGO_NET_OFFLINE: 'true'
+        run: cargo +nightly fuzz run "$TARGET" -- -max_total_time=30 -max_len=4096
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: |
+            fuzz/Cargo.lock
+            fuzz/artifacts/
+          if-no-files-found: warn

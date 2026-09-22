@@ -4,6 +4,17 @@ yanked = "deny"
 [licenses]
 allow = ["MIT", "Apache-2.0", "Unicode-3.0", "BSD-3-Clause", "ISC"]
 
+# Existing interprocess dependencies; keep the allowance package-specific.
+[[licenses.exceptions]]
+name = "doctest-file"
+version = "=1.1.1"
+allow = ["0BSD"]
+
+[[licenses.exceptions]]
+name = "recvmsg"
+version = "=1.0.0"
+allow = ["0BSD"]
+
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"

@@ -21,7 +21,7 @@ thiserror.workspace = true
 log.workspace = true
 
 [dev-dependencies]
-assuan-client = { path = "../assuan-client" }
+assuan-client = { version = "0.1.0", path = "../assuan-client" }
 tokio = { workspace = true, features = ["macros", "rt", "io-util", "test-util"] }
 
 [lints]

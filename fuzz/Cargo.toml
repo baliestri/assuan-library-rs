@@ -1,0 +1,44 @@
+[package]
+name = "assuan-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+members = ["."]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+assuan-protocol = { path = "../crates/assuan-protocol" }
+assuan-sexpr = { path = "../crates/assuan-sexpr" }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+implicit_return = "deny"
+needless_return = "allow"
+
+[[bin]]
+name = "sexpr"
+path = "fuzz_targets/sexpr.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wire"
+path = "fuzz_targets/wire.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "states"
+path = "fuzz_targets/states.rs"
+test = false
+doc = false
+bench = false
