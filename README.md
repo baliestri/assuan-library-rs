@@ -4,7 +4,7 @@ A Rust implementation of the [Assuan protocol](https://gnupg.org/documentation/m
 
 ## Project status
 
-All seven crates are implemented. The facade exposes borrowed protocol types, protected buffers, streaming client transactions and inquiries, typed server handlers and hooks, bounded concurrent serving, canonical S-expressions, and compile-validated macros. TCP, Unix sockets, Windows named pipes and application-defined byte transports are supported on their respective platforms. Native agent discovery does not launch services. Independent interoperability tests with real GnuPG pass on Windows, Linux and macOS. No package has been published.
+All seven crates are implemented. The facade exposes borrowed protocol types, protected buffers, streaming client transactions and inquiries, typed server handlers and hooks, bounded concurrent serving, canonical S-expressions, and compile-validated macros. TCP, Unix sockets, Windows named pipes and application-defined byte transports are supported on their respective platforms. Native agent discovery does not launch services. Independent interoperability tests with real GnuPG pass on Windows, Linux and macOS. Published versions are listed in GitHub Releases.
 
 ## Workspace design
 
@@ -41,7 +41,7 @@ cargo +nightly fmt --all -- --check
 
 ## Getting started
 
-Use a path dependency on `crates/assuan-library` until publication. The facade
+Use crates.io for released versions, or a path dependency on `crates/assuan-library` in a checkout. The facade
 enables `client`, `server`, `macros` and `sexpr` by default; each can be
 selected independently with default features disabled. Protocol and transport
 remain available. Macros do not implicitly enable client or server.

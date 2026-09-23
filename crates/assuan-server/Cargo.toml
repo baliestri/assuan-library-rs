@@ -17,15 +17,15 @@ all-features = true
 targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "aarch64-apple-darwin"]
 
 [dependencies]
-assuan-protocol = { version = "0.1.0", path = "../assuan-protocol" }
-assuan-transport = { version = "0.1.0", path = "../assuan-transport" }
+assuan-protocol = { version = "1.0.0", path = "../assuan-protocol" }
+assuan-transport = { version = "1.0.0", path = "../assuan-transport" }
 tokio = { workspace = true, features = ["time", "rt", "sync", "macros"] }
 zeroize.workspace = true
 thiserror.workspace = true
 log.workspace = true
 
 [dev-dependencies]
-assuan-client = { version = "0.1.0", path = "../assuan-client" }
+assuan-client = { version = "1.0.0", path = "../assuan-client" }
 tokio = { workspace = true, features = ["macros", "rt", "io-util", "test-util"] }
 
 [lints]

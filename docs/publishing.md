@@ -2,8 +2,7 @@
 
 ## Scope
 
-The workspace contains seven publishable crates at version 0.1.0. No release
-has been published. CI validates source, feature combinations, interoperability
+The workspace contains seven publishable crates at version 1.0.0. Published versions are listed in GitHub Releases. CI validates source, feature combinations, interoperability
 and fuzz smoke tests. The manual Release workflow publishes packages and creates
 release tags; see [release operations](releasing.md).
 The commands below prepare and inspect local archives without registry writes.
@@ -61,8 +60,8 @@ external design/plan files, personal artifacts, build outputs or credentials.
 Inspect an archive manually when investigating a failure:
 
 ```powershell
-tar -tf target/package/assuan-library-0.1.0.crate
-tar -xOf target/package/assuan-library-0.1.0.crate assuan-library-0.1.0/Cargo.toml
+tar -tf target/package/assuan-library-1.0.0.crate
+tar -xOf target/package/assuan-library-1.0.0.crate assuan-library-1.0.0/Cargo.toml
 ```
 
 Internal dependencies retain a version alongside their development `path`;

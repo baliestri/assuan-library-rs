@@ -20,11 +20,11 @@ that does not expose the optional S-expression API in the facade.
 
 ```toml
 [dependencies]
-assuan-library = { version = "0.1.0", default-features = false, features = ["client"] }
+assuan-library = { version = "1.0.0", default-features = false, features = ["client"] }
 tokio = { version = "1", features = ["macros", "rt", "net", "time"] }
 ```
 
-No package has been published yet. Inside a checkout, use a Cargo path
+For released versions, use crates.io. Inside a checkout, use a Cargo path
 dependency on `crates/assuan-library`. Types are reexports of the component
 crates, so mixing the facade with direct dependencies preserves type identity.
 
