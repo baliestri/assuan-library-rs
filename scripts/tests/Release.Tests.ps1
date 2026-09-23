@@ -2,6 +2,9 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+$versions = Get-TestReleaseVersions $repo
+$releaseTag = "v$($versions.release)"
+$releaseTagRef = "refs/tags/$releaseTag"
 $workflow = [IO.File]::ReadAllText("$repo/.github/workflows/release.yml").Replace("`r`n","`n")
 function Get-ReleaseStep([string] $Name) {
   $namePattern = [regex]::Escape($Name)
@@ -58,7 +61,7 @@ function New-ReleaseFixture([string] $Name) {
   return [pscustomobject]@{path=$checkout;remote="$dir/origin.git";base=$base}
 }
 function Invoke-Preparation($Fixture) {
-  $env:VERSION = '0.2.0'
+  $env:VERSION = $versions.release
   $env:EVENT_SHA = $Fixture.base
   $env:GITHUB_OUTPUT = Join-Path (Split-Path $Fixture.path) 'outputs.txt'
   Push-Location $Fixture.path
@@ -82,7 +85,7 @@ try {
   $env:GITHUB_REF = 'refs/heads/develop'
   $env:AUTHENTICATION = 'bootstrap'
   $env:BOOTSTRAP_CONFIGURED = 'true'
-  $env:VERSION = '0.2.0'
+  $env:VERSION = $versions.release
   & $dispatch
   $env:BOOTSTRAP_CONFIGURED = 'false'
   Assert-Throws { & $dispatch } 'CARGO_BOOTSTRAP_TOKEN'
@@ -92,7 +95,7 @@ try {
     $env:VERSION = $value
     Assert-Throws { & $dispatch } 'version'
   }
-  $env:VERSION = '0.2.0'
+  $env:VERSION = $versions.release
   $env:GITHUB_REF = 'refs/heads/main'
   Assert-Throws { & $dispatch } 'develop'
   $env:GITHUB_REF = 'refs/heads/develop'
@@ -103,8 +106,8 @@ try {
   try {
     & $promote | Out-Null
     Assert-Equal (Test-Git --git-dir=$($fixture.remote) rev-parse refs/heads/main)[0] $sha
-    Assert-Equal (Test-Git --git-dir=$($fixture.remote) rev-parse refs/tags/v0.2.0)[0] $sha
-    Assert-Equal (Test-Git cat-file -t refs/tags/v0.2.0)[0] 'commit'
+    Assert-Equal (Test-Git --git-dir=$($fixture.remote) rev-parse $releaseTagRef)[0] $sha
+    Assert-Equal (Test-Git cat-file -t $releaseTagRef)[0] 'commit'
     # Repeating promotion accepts exactly the same refs without moving a tag.
     & $promote | Out-Null
     & $sync | Out-Null
@@ -135,8 +138,8 @@ try {
   $sha = Invoke-Preparation $fixture
   Push-Location $fixture.path
   try {
-    Test-Git -c tag.gpgsign=false tag v0.2.0 $fixture.base | Out-Null
-    Test-Git push origin refs/tags/v0.2.0 | Out-Null
+    Test-Git -c tag.gpgsign=false tag $releaseTag $fixture.base | Out-Null
+    Test-Git push origin $releaseTagRef | Out-Null
     Assert-Throws { & $promote } 'tag conflicts'
     Assert-Equal (Test-Git --git-dir=$($fixture.remote) rev-parse refs/heads/main)[0] $fixture.base
   } finally { Pop-Location }
@@ -152,7 +155,7 @@ try {
     Test-Git switch --detach $sha | Out-Null
     Assert-Throws { & $promote } 'Main diverged'
     Assert-Equal (Test-Git --git-dir=$($fixture.remote) rev-parse refs/heads/main)[0] $advanced
-    Assert-Equal ((Test-Git ls-remote origin refs/tags/v0.2.0).Count) 0
+    Assert-Equal ((Test-Git ls-remote origin $releaseTagRef).Count) 0
   } finally { Pop-Location }
 
   $fixture = New-ReleaseFixture 'merge-conflict'
@@ -161,7 +164,8 @@ try {
   try {
     & $promote | Out-Null
     Test-Git switch develop | Out-Null
-    $manifest = [IO.File]::ReadAllText("$PWD/Cargo.toml").Replace('version = "0.1.0"','version = "0.3.0"')
+    $manifest = [IO.File]::ReadAllText("$PWD/Cargo.toml").Replace(
+      "version = `"$($versions.current)`"", "version = `"$($versions.next)`"")
     [IO.File]::WriteAllText("$PWD/Cargo.toml",$manifest)
     Test-Git add -- Cargo.toml | Out-Null
     Test-Git commit -m 'Conflicting version edit' | Out-Null
@@ -169,7 +173,7 @@ try {
     Test-Git push origin HEAD:refs/heads/develop | Out-Null
     Assert-Throws { & $sync } 'git|conflict'
     Assert-Equal (Test-Git --git-dir=$($fixture.remote) rev-parse refs/heads/develop)[0] $advanced
-    Assert-Equal (Test-Git --git-dir=$($fixture.remote) rev-parse refs/tags/v0.2.0)[0] $sha
+    Assert-Equal (Test-Git --git-dir=$($fixture.remote) rev-parse $releaseTagRef)[0] $sha
   } finally { Pop-Location }
 
   $jobNames = @('prepare','ci','interop','fuzz','build','publish','docs','sync')
