@@ -24,12 +24,12 @@ macros = ["dep:assuan-macros"]
 sexpr = ["dep:assuan-sexpr"]
 
 [dependencies]
-assuan-protocol = { path = "../assuan-protocol", version = "0.1.0" }
-assuan-transport = { path = "../assuan-transport", version = "0.1.0" }
-assuan-client = { path = "../assuan-client", version = "0.1.0", optional = true }
-assuan-server = { path = "../assuan-server", version = "0.1.0", optional = true }
-assuan-macros = { path = "../assuan-macros", version = "0.1.0", optional = true }
-assuan-sexpr = { path = "../assuan-sexpr", version = "0.1.0", optional = true }
+assuan-protocol = { path = "../assuan-protocol", version = "1.0.0" }
+assuan-transport = { path = "../assuan-transport", version = "1.0.0" }
+assuan-client = { path = "../assuan-client", version = "1.0.0", optional = true }
+assuan-server = { path = "../assuan-server", version = "1.0.0", optional = true }
+assuan-macros = { path = "../assuan-macros", version = "1.0.0", optional = true }
+assuan-sexpr = { path = "../assuan-sexpr", version = "1.0.0", optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt", "net", "io-util", "sync", "signal", "time", "process"] }
