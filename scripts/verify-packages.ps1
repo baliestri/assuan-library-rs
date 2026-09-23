@@ -101,8 +101,7 @@ try {
       files = $entries.Count
     }
   }
-  & cargo publish --workspace --dry-run --locked --registry crates-io
-  if ($LASTEXITCODE -ne 0) { throw 'Joint Cargo publish dry-run failed.' }
+  & "$PSScriptRoot/publish-crates.ps1" -Version $packages[0].version -DryRun
   if ((Get-FileHash -LiteralPath $lockPath -Algorithm SHA256).Hash -cne $lockHash) { throw 'Cargo.lock changed during verification.' }
   $sha = & git rev-parse HEAD
   if ($LASTEXITCODE -ne 0) { throw 'Cannot read package commit.' }

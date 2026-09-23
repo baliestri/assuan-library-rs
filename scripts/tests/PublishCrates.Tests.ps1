@@ -1,7 +1,7 @@
 # All commands crossing the registry boundary are scoped mocks. No network or upload.
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $publishFixtureRoot = Join-Path $repo "target/release-tests/publish-$([Guid]::NewGuid().ToString('N'))"
-$null = New-Item -ItemType Directory -Path "$publishFixtureRoot/scripts/release", "$publishFixtureRoot/target/package" -Force
+$null = New-Item -ItemType Directory -Path "$publishFixtureRoot/scripts/release", "$publishFixtureRoot/target/package", "$publishFixtureRoot/build output/package/tmp-crate" -Force
 Copy-Item "$PSScriptRoot/../publish-crates.ps1" "$publishFixtureRoot/scripts/publish-crates.ps1"
 Copy-Item "$PSScriptRoot/../release/Version.psm1", "$PSScriptRoot/../release/config.json" "$publishFixtureRoot/scripts/release/"
 $publishFixtureConfig = Get-Content "$PSScriptRoot/../release/config.json" -Raw | ConvertFrom-Json
@@ -9,22 +9,31 @@ $publishFixtureMetadata = @{
   packages = @($publishFixtureConfig.crates | ForEach-Object { @{ id=$_; name=$_; version='0.1.0' } })
   workspace_members = @($publishFixtureConfig.crates)
   target_directory = "$publishFixtureRoot/target"
+  build_directory = "$publishFixtureRoot/build output"
 }
 foreach ($name in $publishFixtureConfig.crates) {
-  [IO.File]::WriteAllText("$publishFixtureRoot/target/package/$name-0.1.0.crate", 'fixture archive')
+  [IO.File]::WriteAllText("$publishFixtureRoot/target/package/$name-0.1.0.crate", 'stale package archive')
 }
-$publishFixtureChecksum = (Get-FileHash "$publishFixtureRoot/target/package/$($publishFixtureConfig.crates[0])-0.1.0.crate").Hash.ToLowerInvariant()
+$publishFixtureChecksum = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes('fixture archive'))).ToLowerInvariant()
 
 $publishFixtureState = @{}
 function Reset-PublishFixture {
   $publishFixtureState.Clear()
+  foreach ($name in $publishFixtureConfig.crates) {
+    [IO.File]::Delete("$publishFixtureRoot/build output/package/tmp-crate/$name-0.1.0.crate")
+  }
   $initial = @{
     Calls=[Collections.Generic.List[string]]::new(); Uploads=[Collections.Generic.List[string]]::new()
-    Dirty=$false; BadToolchain=$false; BadVersion=$false; MissingCrate=$false; CargoFailure=''
+    Dirty=$false; BadToolchain=$false; BadVersion=$false; MissingCrate=$false; CargoFailure=''; MissingArchive=''
     HttpFailure=0; NetworkFailure=$false; Delays=0; Requests=0; Sleeps=0; Yanked=$false; BadChecksum=$false; DryFailure=$false
   }
   foreach ($key in $initial.Keys) { $publishFixtureState[$key] = $initial[$key] }
   [IO.File]::WriteAllText("$publishFixtureRoot/Cargo.lock", 'fixture lock')
+}
+function New-PublishArchive([string] $Name) {
+  if ($publishFixtureState.MissingArchive -cne $Name) {
+    [IO.File]::WriteAllText("$publishFixtureRoot/build output/package/tmp-crate/$Name-0.1.0.crate", 'fixture archive')
+  }
 }
 function git {
   $global:LASTEXITCODE = 0
@@ -47,12 +56,14 @@ function cargo {
   }
   if ($command -ceq 'publish --workspace --dry-run --locked --registry crates-io') {
     if ($publishFixtureState.DryFailure) { $global:LASTEXITCODE = 1 }
+    else { foreach ($name in $publishFixtureConfig.crates) { New-PublishArchive $name } }
     return
   }
   if ($command -match '^publish -p ([a-z-]+) --locked --registry crates-io$') {
     $crate = $Matches[1]
     $publishFixtureState.Uploads.Add($crate)
     if ($publishFixtureState.CargoFailure -ceq $crate) { $global:LASTEXITCODE = 1 }
+    else { New-PublishArchive $crate }
     return
   }
   throw "Unexpected Cargo call: $command"
@@ -123,6 +134,16 @@ try {
   Assert-Equal $publishFixtureState.Requests 7
   Assert-True ($result.Log -match 'Published and confirmed all 7 crates')
   Assert-True ($result.Log -notmatch 'fixture-token')
+
+  # A stale cargo package output must not stand in for a missing publish archive.
+  foreach ($dry in $false, $true) {
+    Reset-PublishFixture
+    $publishFixtureState.MissingArchive = $publishFixtureConfig.crates[0]
+    $result = Invoke-PublishFixture -DryRun:$dry
+    Assert-True ($result.Error -match 'Missing publication archive')
+    Assert-Equal $publishFixtureState.Uploads.Count $(if ($dry) { 0 } else { 1 })
+    Assert-Equal $publishFixtureState.Requests 0
+  }
 
   # A Cargo error stops immediately, even when prior uploads are confirmed.
   foreach ($position in 0, 2) {
