@@ -1,0 +1,304 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable shared version (X.Y.Z).
+        required: true
+        type: string
+      authentication:
+        description: Bootstrap token for first publication; OIDC for configured publishers.
+        required: true
+        type: choice
+        options: [oidc, bootstrap]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assuan-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      source_sha: ${{ steps.prepare.outputs.source_sha }}
+      version: ${{ steps.prepare.outputs.version }}
+    steps:
+      - name: Validate dispatch
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+          AUTHENTICATION: ${{ inputs.authentication }}
+          BOOTSTRAP_CONFIGURED: ${{ secrets.CARGO_BOOTSTRAP_TOKEN != '' }}
+        run: |
+          if ($env:GITHUB_REF -cne 'refs/heads/develop') { throw 'Run releases from develop.' }
+          if ($env:VERSION -cnotmatch '\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z') { throw 'Expected stable version X.Y.Z.' }
+          if ($env:AUTHENTICATION -cnotin @('bootstrap','oidc')) { throw 'Invalid authentication mode.' }
+          if ($env:AUTHENTICATION -ceq 'bootstrap' -and $env:BOOTSTRAP_CONFIGURED -cne 'true') { throw 'Configure CARGO_BOOTSTRAP_TOKEN first.' }
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Prepare release commit
+        id: prepare
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          Import-Module ./scripts/release/Version.psm1
+          $version = ConvertTo-ReleaseVersion $env:VERSION
+          $branch = "release/v$version"
+          git fetch origin main develop --tags
+          $head = git rev-parse HEAD
+          if ($head -cne $env:EVENT_SHA -or $head -cne (git rev-parse origin/develop)) { throw 'Develop moved; dispatch a fresh run.' }
+          $main = git rev-parse origin/main
+          if ((git merge-base $main $head) -cne $main) { throw 'Synchronize main into develop before releasing.' }
+          if (@(git status --porcelain --untracked-files=all).Count) { throw 'Preparation requires a clean checkout.' }
+          if (@(git ls-remote origin "refs/heads/$branch" "refs/tags/v$version").Count) { throw 'Release branch or tag already exists; inspect the previous run before recovery.' }
+          $edits = @(Get-VersionEdits -Root $PWD.Path -Version $version)
+          git config --local user.name 'github-actions[bot]'
+          git config --local user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config --local commit.gpgsign false
+          git config --local tag.gpgsign false
+          git switch -c $branch
+          Set-ReleaseVersion -Root $PWD.Path -Edits $edits
+          if ($edits.Count) { git add -- @($edits.path) }
+          git commit --allow-empty --no-gpg-sign -m "chore(release): prepare v$version"
+          if (@(git status --porcelain --untracked-files=all).Count) { throw 'Release commit left uncommitted files.' }
+          $sha = git rev-parse HEAD
+          git push origin "HEAD:refs/heads/$branch"
+          "source_sha=$sha" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "Prepared v$version at $sha." >> $env:GITHUB_STEP_SUMMARY
+
+  ci:
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+    with:
+      source_sha: ${{ needs.prepare.outputs.source_sha }}
+  interop:
+    needs: prepare
+    uses: ./.github/workflows/interop.yml
+    with:
+      source_sha: ${{ needs.prepare.outputs.source_sha }}
+  fuzz:
+    needs: prepare
+    uses: ./.github/workflows/fuzz.yml
+    with:
+      source_sha: ${{ needs.prepare.outputs.source_sha }}
+
+  build:
+    needs: prepare
+    outputs:
+      artifact_name: ${{ steps.bundle.outputs.artifact_name }}
+    permissions:
+      contents: read
+      pages: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RUSTUP_TOOLCHAIN: 1.98.1
+      RUSTDOCFLAGS: -D warnings -D rustdoc::broken_intra_doc_links
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          persist-credentials: false
+      - name: Install pinned PowerShell
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/powershell-7.6.6-linux-x64.tar.gz"
+          curl --fail --location --retry 3 --output "$archive" \
+            https://github.com/PowerShell/PowerShell/releases/download/v7.6.6/powershell-7.6.6-linux-x64.tar.gz
+          echo "ddbc4a2d113bbd46d283cfedcbcd117a70caefd7673f41f2b4e0000badf103bc  $archive" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/assuan-pwsh"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/assuan-pwsh"
+          chmod +x "$RUNNER_TEMP/assuan-pwsh/pwsh"
+          echo "$RUNNER_TEMP/assuan-pwsh" >> "$GITHUB_PATH"
+      - name: Configure Pages URL
+        id: pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Verify packages and build documentation
+        id: bundle
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ((git rev-parse HEAD) -cne $env:SOURCE_SHA) { throw 'Unexpected build commit.' }
+          if ($PSVersionTable.PSVersion.ToString() -cne '7.6.6') { throw 'Wrong documentation PowerShell version.' }
+          rustup toolchain install 1.98.1 --profile minimal
+          cargo generate-lockfile
+          ./scripts/verify-packages.ps1
+          cargo doc --locked --workspace --all-features --no-deps
+          ./scripts/build-docs.ps1 -Version $env:VERSION -BaseUrl ($env:BASE_URL.TrimEnd('/') + '/')
+          Import-Module ./scripts/release/Archive.psm1
+          $null = New-Item -ItemType Directory -Path target/release-build
+          $bundle = New-DocsBundle "target/release-docs/$env:VERSION" "target/release-build/docs-v$env:VERSION.zip"
+          [IO.File]::WriteAllText("$PWD/target/release-build/docs-v$env:VERSION.sha256", $bundle.sha256 + [char]10, [Text.UTF8Encoding]::new($false))
+          Copy-Item -LiteralPath Cargo.lock -Destination target/release-build/Cargo.lock
+          "artifact_name=release-build-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT" >> $env:GITHUB_OUTPUT
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.bundle.outputs.artifact_name }}
+          path: target/release-build/
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, ci, interop, fuzz, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      RUSTUP_TOOLCHAIN: 1.98.1
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: target/release-build
+      - name: Check gates and prepared files
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          CI_SHA: ${{ needs.ci.outputs.source_sha }}
+          INTEROP_SHA: ${{ needs.interop.outputs.source_sha }}
+          FUZZ_SHA: ${{ needs.fuzz.outputs.source_sha }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          foreach ($sha in $env:CI_SHA,$env:INTEROP_SHA,$env:FUZZ_SHA,(git rev-parse HEAD)) {
+            if ($sha -cne $env:SOURCE_SHA -or $sha -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Release gate SHA mismatch.' }
+          }
+          $checksum = [IO.File]::ReadAllText("$PWD/target/release-build/docs-v$env:VERSION.sha256")
+          if ($checksum -cnotmatch '\A[0-9a-f]{64}\n\z' -or (Get-FileHash "target/release-build/docs-v$env:VERSION.zip").Hash.ToLowerInvariant() -cne $checksum.TrimEnd([char]10)) { throw 'Documentation bundle checksum mismatch.' }
+          Copy-Item -LiteralPath target/release-build/Cargo.lock -Destination Cargo.lock
+          rustup toolchain install 1.98.1 --profile minimal
+      - name: Authenticate with crates.io
+        if: inputs.authentication == 'oidc'
+        id: auth
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1
+      - name: Promote validated commit and tag
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $sha = $env:SOURCE_SHA
+          $tag = "v$env:VERSION"
+          if ($sha -cnotmatch '\A[0-9a-f]{40}\z' -or $env:VERSION -cnotmatch '\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z') { throw 'Invalid promotion identity.' }
+          if ((git rev-parse HEAD) -cne $sha) { throw 'Unexpected promotion checkout.' }
+          git fetch origin main "release/$tag" --tags
+          if ((git rev-parse "origin/release/$tag") -cne $sha) { throw 'Release branch moved.' }
+          $main = git rev-parse origin/main
+          if ((git merge-base $main $sha) -cne $main) { throw 'Main diverged; publication stopped.' }
+          $remoteTag = @(git ls-remote origin "refs/tags/$tag")
+          if ($remoteTag.Count -gt 0 -and ($remoteTag.Count -ne 1 -or $remoteTag[0].Split([char]9)[0] -cne $sha)) { throw 'Release tag conflicts with validated SHA.' }
+          if ($remoteTag.Count -eq 0) { git -c tag.gpgsign=false tag $tag $sha }
+          git push --atomic origin "${sha}:refs/heads/main" "refs/tags/${tag}:refs/tags/$tag"
+      - name: Publish with bootstrap token
+        if: inputs.authentication == 'bootstrap'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_BOOTSTRAP_TOKEN }}
+        run: ./scripts/publish-crates.ps1 -Version $env:VERSION
+      - name: Publish with OIDC token
+        if: inputs.authentication == 'oidc'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: ./scripts/publish-crates.ps1 -Version $env:VERSION
+      - name: Create GitHub Release with documentation
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          gh release create "v$env:VERSION" "target/release-build/docs-v$env:VERSION.zip" "target/release-build/docs-v$env:VERSION.sha256" --repo $env:GITHUB_REPOSITORY --verify-tag --target $env:SOURCE_SHA --title "v$env:VERSION" --generate-notes
+          "Published seven crates and GitHub Release v$env:VERSION at $env:SOURCE_SHA." >> $env:GITHUB_STEP_SUMMARY
+
+  docs:
+    needs: publish
+    uses: ./.github/workflows/docs.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+  sync:
+    needs: [prepare, docs]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 0
+      - name: Synchronize develop
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($env:SOURCE_SHA -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Invalid synchronization SHA.' }
+          git fetch origin develop main --tags
+          if ((git rev-parse "refs/tags/v$env:VERSION") -cne $env:SOURCE_SHA) { throw 'Release tag changed.' }
+          if ((git merge-base $env:SOURCE_SHA origin/main) -cne $env:SOURCE_SHA) { throw 'Main does not contain the release.' }
+          git config --local user.name 'github-actions[bot]'
+          git config --local user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config --local commit.gpgsign false
+          git switch --detach origin/develop
+          git merge --no-edit --no-gpg-sign $env:SOURCE_SHA
+          git push origin HEAD:refs/heads/develop
+          "Develop contains v$env:VERSION. Release and Pages are complete." >> $env:GITHUB_STEP_SUMMARY
+
+  summary:
+    if: ${{ always() }}
+    needs: [prepare, ci, interop, fuzz, build, publish, docs, sync]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report release outcome
+        shell: pwsh
+        env:
+          JOBS: ${{ toJSON(needs) }}
+        run: |
+          $jobs = $env:JOBS | ConvertFrom-Json -AsHashtable
+          '## Release outcome' >> $env:GITHUB_STEP_SUMMARY
+          foreach ($name in $jobs.Keys) {
+            "$name : $($jobs[$name].result)" >> $env:GITHUB_STEP_SUMMARY
+          }
+          'If publication stopped, inspect the registry before continuing. Redeploy documentation through the Documentation workflow; do not republish crates to fix Pages.' >> $env:GITHUB_STEP_SUMMARY
+          foreach ($job in $jobs.Values) {
+            if ($job.result -cne 'success') { throw 'Release incomplete; see job results and docs/releasing.md.' }
+          }

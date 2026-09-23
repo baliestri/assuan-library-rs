@@ -1,6 +1,16 @@
 name: GnuPG interoperability
 
 on:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Exact commit to validate (40 lowercase hexadecimal characters).
+        required: true
+        type: string
+    outputs:
+      source_sha:
+        description: Commit validated by every required job.
+        value: ${{ jobs.gate.outputs.source_sha }}
   push:
   pull_request:
   workflow_dispatch:
@@ -9,7 +19,28 @@ permissions:
   contents: read
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.source.outputs.source_sha }}
+    steps:
+      - name: Validate gate inputs
+        id: source
+        shell: pwsh
+        env:
+          CALL_INPUTS: ${{ toJSON(inputs) }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $call = $env:CALL_INPUTS | ConvertFrom-Json -AsHashtable -NoEnumerate
+          if ($null -eq $call) { $call = @{} }
+          if ($call -isnot [Collections.IDictionary]) { throw 'Invalid release inputs.' }
+          $sha = if ($call.ContainsKey('source_sha')) { $call.source_sha } else { $env:EVENT_SHA }
+          if ($sha -isnot [string] -or $sha -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Expected a full lowercase commit SHA.' }
+          "source_sha=$sha" >> $env:GITHUB_OUTPUT
   interop:
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
@@ -19,12 +50,25 @@ jobs:
     env:
       ASSUAN_GNUPG_REQUIRED: "1"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
+      - name: Verify checkout
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          $actual = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect gate checkout.' }
+          if ($env:SOURCE_SHA -cnotmatch '\A[0-9a-f]{40}\z' -or $actual -cne $env:SOURCE_SHA) { throw 'Gate checkout does not match the requested SHA.' }
+          "Verified checkout: $actual" >> $env:GITHUB_STEP_SUMMARY
       - name: Install Rust
         shell: bash
         run: rustup toolchain install 1.98.1 --profile minimal
+      - name: Resolve dependencies
+        shell: pwsh
+        run: cargo generate-lockfile
       - name: Install GnuPG on Linux
         if: runner.os == 'Linux'
         shell: bash
@@ -67,10 +111,32 @@ jobs:
         if: runner.os != 'Windows'
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/assuan-target
-        run: cargo test -p assuan-library --test interop_agent --test interop_server -- --nocapture
+        run: cargo test --locked -p assuan-library --test interop_agent --test interop_server -- --nocapture
       - name: Test with short Windows tool paths
         if: runner.os == 'Windows'
         shell: pwsh
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/assuan-target
         run: ./scripts/test-interop.ps1
+  gate:
+    if: ${{ always() }}
+    needs: [prepare, interop]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.result.outputs.source_sha }}
+    steps:
+      - name: Report completed gate
+        id: result
+        shell: pwsh
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          $results = $env:JOB_RESULTS | ConvertFrom-Json -AsHashtable
+          foreach ($job in $results.Values) {
+            if ($job.result -cne 'success') { throw 'A required gate job did not succeed.' }
+          }
+          if ($env:SOURCE_SHA -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Missing validated gate SHA.' }
+          "source_sha=$env:SOURCE_SHA" >> $env:GITHUB_OUTPUT
+          "All required jobs passed for commit $env:SOURCE_SHA" >> $env:GITHUB_STEP_SUMMARY

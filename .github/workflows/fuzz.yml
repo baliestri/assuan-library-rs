@@ -1,6 +1,16 @@
 name: Fuzz smoke tests
 
 on:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Exact commit to validate (40 lowercase hexadecimal characters).
+        required: true
+        type: string
+    outputs:
+      source_sha:
+        description: Commit validated by every required job.
+        value: ${{ jobs.gate.outputs.source_sha }}
   push:
   pull_request:
   workflow_dispatch:
@@ -11,7 +21,28 @@ permissions:
   contents: read
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.source.outputs.source_sha }}
+    steps:
+      - name: Validate gate inputs
+        id: source
+        shell: pwsh
+        env:
+          CALL_INPUTS: ${{ toJSON(inputs) }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $call = $env:CALL_INPUTS | ConvertFrom-Json -AsHashtable -NoEnumerate
+          if ($null -eq $call) { $call = @{} }
+          if ($call -isnot [Collections.IDictionary]) { throw 'Invalid release inputs.' }
+          $sha = if ($call.ContainsKey('source_sha')) { $call.source_sha } else { $env:EVENT_SHA }
+          if ($sha -isnot [string] -or $sha -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Expected a full lowercase commit SHA.' }
+          "source_sha=$sha" >> $env:GITHUB_OUTPUT
   fuzz:
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -19,9 +50,19 @@ jobs:
       matrix:
         target: [sexpr, wire, states]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
+      - name: Verify checkout
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          $actual = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect gate checkout.' }
+          if ($env:SOURCE_SHA -cnotmatch '\A[0-9a-f]{40}\z' -or $actual -cne $env:SOURCE_SHA) { throw 'Gate checkout does not match the requested SHA.' }
+          "Verified checkout: $actual" >> $env:GITHUB_STEP_SUMMARY
       - name: Install fuzz toolchain
         run: |
           rustup toolchain install nightly --profile minimal
@@ -29,9 +70,9 @@ jobs:
           rustc +nightly --version --verbose
           cargo +nightly fuzz --version
       - name: Resolve fuzz dependencies
-        run: |
-          cargo +nightly generate-lockfile --manifest-path fuzz/Cargo.toml
-          cargo +nightly fetch --locked --manifest-path fuzz/Cargo.toml
+        run: cargo +nightly generate-lockfile --manifest-path fuzz/Cargo.toml
+      - name: Fetch fuzz dependencies
+        run: cargo +nightly fetch --locked --manifest-path fuzz/Cargo.toml
       - name: Seed writable corpus
         env:
           TARGET: ${{ matrix.target }}
@@ -42,12 +83,38 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
           CARGO_NET_OFFLINE: 'true'
-        run: cargo +nightly fuzz run "$TARGET" -- -max_total_time=30 -max_len=4096
-      - uses: actions/upload-artifact@v4
+        run: |
+          before=$(sha256sum fuzz/Cargo.lock)
+          cargo +nightly fuzz run "$TARGET" -- -max_total_time=30 -max_len=4096
+          after=$(sha256sum fuzz/Cargo.lock)
+          test "$before" = "$after"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: fuzz-${{ matrix.target }}
+          name: fuzz-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
           path: |
             fuzz/Cargo.lock
             fuzz/artifacts/
           if-no-files-found: warn
+  gate:
+    if: ${{ always() }}
+    needs: [prepare, fuzz]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.result.outputs.source_sha }}
+    steps:
+      - name: Report completed gate
+        id: result
+        shell: pwsh
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          $results = $env:JOB_RESULTS | ConvertFrom-Json -AsHashtable
+          foreach ($job in $results.Values) {
+            if ($job.result -cne 'success') { throw 'A required gate job did not succeed.' }
+          }
+          if ($env:SOURCE_SHA -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Missing validated gate SHA.' }
+          "source_sha=$env:SOURCE_SHA" >> $env:GITHUB_OUTPUT
+          "All required jobs passed for commit $env:SOURCE_SHA" >> $env:GITHUB_STEP_SUMMARY

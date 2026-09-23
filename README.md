@@ -73,10 +73,38 @@ cargo check --manifest-path crates/assuan-library/tests/fixtures/renamed/Cargo.t
 
 Read the [security and ownership guide](docs/security.md) before exchanging secrets.
 The [publishing guide](docs/publishing.md) describes local verification of all seven
-archives and the prerequisites for a future release. Run `./scripts/verify-packages.ps1`
+archives. The [release guide](docs/releasing.md) explains the automated release
+and Pages workflows, configuration and recovery. Run `./scripts/verify-packages.ps1`
 from a clean checkout after approved commits; it does not publish packages.
 See [CI coverage](docs/continuous-integration.md) and
 [protocol compatibility](docs/protocol-compatibility.md) for the tested matrix.
+
+## Build versioned documentation
+
+Use PowerShell 7.6.6, as pinned in `scripts/release/config.json`, and build
+rustdoc before generating the public guides:
+
+```powershell
+cargo doc --workspace --all-features --no-deps
+$version = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages[0].version
+./scripts/build-docs.ps1 -Version $version -BaseUrl https://baliestri.github.io/assuan-library-rs/
+```
+
+The output is `target/release-docs/<version>/`: HTML guides, Markdown sources,
+the API reference, `llms.txt` (navigation) and `llms-full.txt` (selected guides
+and examples). The consolidated file does not replace the detailed API
+reference. `docs/site/sources.json` defines the reviewed source selection;
+operational guides remain optional index entries.
+
+Generation checks local links and anchors and fixes repository links to the
+requested version. It requires existing rustdoc output, does not deploy, and
+refuses to replace an existing version directory. Use `-Output` with another
+directory for a fresh build. Relative output and `-ApiDirectory` paths resolve
+against the workspace, independently of the caller's working directory.
+
+Run script regressions with `pwsh -NoProfile -File scripts/test-release.ps1`.
+External website availability and JavaScript-generated navigation are outside
+the static link check. GitHub Actions publishes the generated files through the versioned Pages workflow.
 
 ## License
 

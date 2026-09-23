@@ -1,0 +1,71 @@
+name: Documentation
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions: {}
+
+# Manual redeploys and release callers serialize the entire collection/deploy.
+concurrency:
+  group: assuan-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Read Pages configuration
+        id: pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        with:
+          enablement: false
+      - name: Install pinned PowerShell
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/powershell-7.6.6-linux-x64.tar.gz"
+          curl --fail --location --retry 3 --output "$archive" \
+            https://github.com/PowerShell/PowerShell/releases/download/v7.6.6/powershell-7.6.6-linux-x64.tar.gz
+          echo "ddbc4a2d113bbd46d283cfedcbcd117a70caefd7673f41f2b4e0000badf103bc  $archive" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/assuan-pwsh"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/assuan-pwsh"
+          chmod +x "$RUNNER_TEMP/assuan-pwsh/pwsh"
+          echo "$RUNNER_TEMP/assuan-pwsh" >> "$GITHUB_PATH"
+      - name: Collect and assemble every stable release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_HOST: github.com
+          REPOSITORY: ${{ github.repository }}
+          PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = & ./scripts/collect-docs.ps1 -Repository $env:REPOSITORY -Output target/pages-bundles
+          $baseUrl = $env:PAGES_BASE_URL.TrimEnd('/') + '/'
+          & ./scripts/assemble-docs.ps1 -Manifest $manifest -Output target/pages-site -BaseUrl $baseUrl
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: target/pages-site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy documentation
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

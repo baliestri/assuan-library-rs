@@ -4,7 +4,8 @@
 
 The workspace contains seven publishable crates at version 0.1.0. No release
 has been published. CI validates source, feature combinations, interoperability
-and fuzz smoke tests; it does not publish packages or create release tags.
+and fuzz smoke tests. The manual Release workflow publishes packages and creates
+release tags; see [release operations](releasing.md).
 The commands below prepare and inspect local archives without registry writes.
 
 ## Prerequisites and validation
@@ -28,17 +29,20 @@ matrix is Ubuntu/GnuPG 2.4.4 and macOS/Windows/GnuPG 2.5.22; see
 establish compatibility with every GnuPG version or distribution.
 
 Review changes, obtain staging and commit approvals separately, and create
-GPG-signed commits. From a clean Git tree, run:
+GPG-signed personal commits. Automated release commits use the bot without a
+signature requirement. From a clean Git tree, run:
 
 ```powershell
+cargo generate-lockfile
 ./scripts/verify-packages.ps1
 ```
 
-The script runs `cargo package --workspace --registry crates-io`. Joint
+The script runs `cargo package --workspace --locked --registry crates-io`. Joint
 selection lets Cargo verify unpublished workspace dependencies together in its
 temporary registry. It compiles the packaged crates, checks all seven archives,
 audits paths and normalized dependency declarations, and reports SHA-256 hashes.
-It honors Cargo's target directory from metadata. It never passes `--no-verify`
+It also runs a joint cargo publish --workspace --dry-run --locked and checks
+clean VCS identity. It honors Cargo's target directory from metadata. It never passes `--no-verify`
 or `--allow-dirty`, publishes, reads credentials, stages files or creates commits.
 If packaging fails, resolve the reported failure locally; publishing is not a
 workaround. Cargo's package build is not a replacement for the test suite.
@@ -66,17 +70,8 @@ Cargo removes the path when packaging. Keep versions synchronized when preparing
 a release. Each crate supplies docs.rs metadata; the facade documents all public
 features, while the transport's test-only binary is excluded from that selection.
 
-## Future release process
+## Automated release process
 
-Publishing and CD require a separately approved release procedure. The intended
-reference is the [rustfmt-generator workflow philosophy](https://github.com/baliestri/rustfmt-generator/tree/develop/.github/workflows):
-manual version selection, release preparation from develop, integration into
-main, tagging and synchronization back to develop. An Assuan implementation must
-preserve verified signatures and account for seven registry packages.
-
-Publish dependency foundations first: `assuan-sexpr` and `assuan-protocol`, then
-`assuan-transport`, then `assuan-client` and `assuan-server`, then `assuan-macros`
-(its development dependency uses the server), and finally `assuan-library`.
-Wait for each prerequisite version to resolve in the registry. Review ownership,
-release notes, version updates and fresh verification before authorizing registry
-writes. This guide and its script perform none of those writes.
+The [release guide](releasing.md) covers setup, manual dispatch, version preparation,
+crates.io publication, versioned Pages documentation and failure recovery.
+The local verification commands above perform no registry writes.

@@ -1,0 +1,97 @@
+<#
+.SYNOPSIS
+Publishes the seven workspace crates in dependency order, stopping on failure.
+.DESCRIPTION
+Requires a clean release commit, its existing Cargo.lock and pinned Cargo.
+Authentication must be explicitly supplied through CARGO_REGISTRIES_CRATES_IO_TOKEN
+or CARGO_REGISTRY_TOKEN. DryRun needs no token and uses Cargo's joint workspace
+dry-run, which also works before the workspace dependencies are first published.
+Every successful upload is checked against the public crates.io version and
+archive checksum. There is no skip-existing or automatic partial-release recovery.
+#>
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory)][string] $Version,
+  [switch] $DryRun
+)
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+Import-Module "$PSScriptRoot/release/Version.psm1" -Force
+$Version = ConvertTo-ReleaseVersion $Version
+$config = Get-Content "$PSScriptRoot/release/config.json" -Raw | ConvertFrom-Json
+$confirmed = [Collections.Generic.List[string]]::new()
+$attempted = $null
+Push-Location (Split-Path -Parent $PSScriptRoot)
+try {
+  $status = @(& git status --porcelain --untracked-files=all)
+  if ($LASTEXITCODE -ne 0 -or $status.Count) { throw 'Publication requires a clean Git tree, including untracked files.' }
+  $cargoVersion = & cargo --version
+  if ($LASTEXITCODE -ne 0 -or -not $cargoVersion.StartsWith("cargo $($config.rust) ")) { throw 'Unexpected Cargo toolchain.' }
+  if (-not (Test-Path -LiteralPath 'Cargo.lock' -PathType Leaf)) { throw 'Missing Cargo.lock; resolve dependencies before publication.' }
+  $lockHash = (Get-FileHash -LiteralPath 'Cargo.lock' -Algorithm SHA256).Hash
+  $metadataText = & cargo metadata --locked --no-deps --format-version 1
+  if ($LASTEXITCODE -ne 0) { throw 'Cargo metadata failed.' }
+  $metadata = ($metadataText -join "`n") | ConvertFrom-Json
+  $packages = @($metadata.packages | Where-Object { $_.id -in $metadata.workspace_members })
+  if ($packages.Count -ne $config.crates.Count -or
+      (Compare-Object ($packages.name | Sort-Object) ($config.crates | Sort-Object))) {
+    throw 'The workspace must contain exactly the configured public crates.'
+  }
+  if (@($packages | Where-Object version -CNE $Version).Count) { throw 'Every workspace crate must have the requested release version.' }
+  if (-not $DryRun -and [string]::IsNullOrWhiteSpace($env:CARGO_REGISTRIES_CRATES_IO_TOKEN) -and
+      [string]::IsNullOrWhiteSpace($env:CARGO_REGISTRY_TOKEN)) { throw 'An explicit crates.io token is required for publication.' }
+
+  if ($DryRun) {
+    & cargo publish --workspace --dry-run --locked --registry crates-io
+    if ($LASTEXITCODE -ne 0) { throw 'Joint Cargo publish dry-run failed.' }
+    if ((Get-FileHash -LiteralPath 'Cargo.lock' -Algorithm SHA256).Hash -cne $lockHash) { throw 'Cargo.lock changed during the dry-run.' }
+    Write-Host 'Joint workspace publish dry-run passed. Nothing was published.'
+    return
+  }
+
+  foreach ($name in $config.crates) {
+    if ((Get-FileHash -LiteralPath 'Cargo.lock' -Algorithm SHA256).Hash -cne $lockHash) { throw 'Cargo.lock changed during publication.' }
+    $attempted = $name
+    & cargo publish -p $name --locked --registry crates-io
+    if ($LASTEXITCODE -ne 0) { throw "Cargo publish failed for $name." }
+    $archive = Join-Path $metadata.target_directory "package/$name-$Version.crate"
+    if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw "Missing published archive for $name." }
+    $checksum = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds(300)
+    while ($true) {
+      try {
+        $response = Invoke-RestMethod -Uri "https://crates.io/api/v1/crates/$name/$Version" `
+          -Headers @{ 'User-Agent' = 'assuan-library-release' } -TimeoutSec 30 -MaximumRetryCount 0
+      }
+      catch {
+        # Only an absent version is a propagation delay; other HTTP errors stop.
+        if (-not $_.Exception.PSObject.Properties['Response'] -or -not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404) {
+          throw "Cannot confirm $name on crates.io."
+        }
+        if ([DateTimeOffset]::UtcNow -ge $deadline) { throw "Timed out confirming $name on crates.io." }
+        Start-Sleep -Seconds 5
+        continue
+      }
+      if ($response.version.num -cne $Version -or $response.version.crate -cne $name -or
+          $response.version.yanked -ne $false -or $response.version.checksum -cne $checksum) {
+        throw "Registry version, non-yanked status or archive checksum does not match $name."
+      }
+      break
+    }
+    $confirmed.Add($name)
+    Write-Host "Confirmed $name $Version on crates.io."
+  }
+  if ((Get-FileHash -LiteralPath 'Cargo.lock' -Algorithm SHA256).Hash -cne $lockHash) { throw 'Cargo.lock changed during publication.' }
+  Write-Host "Published and confirmed all $($confirmed.Count) crates for $Version."
+}
+catch {
+  $summary = if ($confirmed.Count) { $confirmed -join ', ' } else { '(none)' }
+  Write-Host "Confirmed publications: $summary."
+  if ($attempted) {
+    Write-Host "Publication stopped at $attempted. Upload may already have happened; inspect crates.io before recovery. Do not blindly rerun."
+  }
+  else { Write-Host 'No upload was attempted.' }
+  throw
+}
+finally { Pop-Location }

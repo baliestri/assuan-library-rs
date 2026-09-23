@@ -1,0 +1,14 @@
+:root { color-scheme: light dark; font: 17px/1.65 system-ui, sans-serif; }
+body { max-width: 76rem; margin: auto; padding: 1.5rem; }
+header, footer { border-block-end: 1px solid GrayText; padding-block: 1rem; }
+footer { border-block-end: 0; border-block-start: 1px solid GrayText; }
+nav { display: flex; gap: 1rem; flex-wrap: wrap; margin-block-start: .5rem; }
+main { max-width: 68rem; padding-block: 1rem 3rem; }
+a { text-underline-offset: .2em; }
+pre { overflow-x: auto; padding: 1rem; border: 1px solid GrayText; border-radius: .25rem; }
+code { font-size: .9em; }
+table { display: block; overflow-x: auto; border-collapse: collapse; }
+th, td { border: 1px solid GrayText; padding: .5rem .75rem; text-align: start; }
+img { max-width: 100%; }
+.skip:not(:focus) { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
+:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

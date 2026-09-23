@@ -1,0 +1,30 @@
+{
+  "repository": "https://github.com/baliestri/assuan-library-rs",
+  "tagFiles": [
+    "crates/assuan-client/LICENSE.md", "crates/assuan-library/LICENSE.md",
+    "crates/assuan-macros/LICENSE.md", "crates/assuan-protocol/LICENSE.md",
+    "crates/assuan-server/LICENSE.md", "crates/assuan-sexpr/LICENSE.md",
+    "crates/assuan-transport/LICENSE.md"
+  ],
+  "sources": [
+    { "source": "README.md", "destination": "index.md", "title": "Assuan overview", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-library/README.md", "destination": "crates/assuan-library.md", "title": "Facade and getting started", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-client/README.md", "destination": "crates/assuan-client.md", "title": "Client transactions and inquiries", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-server/README.md", "destination": "crates/assuan-server.md", "title": "Server handlers and sessions", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-protocol/README.md", "destination": "crates/assuan-protocol.md", "title": "Protocol and protected storage", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-transport/README.md", "destination": "crates/assuan-transport.md", "title": "Standard and custom transports", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-sexpr/README.md", "destination": "crates/assuan-sexpr.md", "title": "Canonical S-expressions", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-macros/README.md", "destination": "crates/assuan-macros.md", "title": "Validated literals and handlers", "includeInFull": true, "optional": false },
+    { "source": "docs/security.md", "destination": "guides/security.md", "title": "Security and ownership", "includeInFull": true, "optional": false },
+    { "source": "docs/protocol-compatibility.md", "destination": "guides/compatibility.md", "title": "Protocol compatibility", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-library/examples/tcp_client.rs", "destination": "examples/tcp-client.md", "title": "TCP client example", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-library/examples/tcp_server.rs", "destination": "examples/tcp-server.md", "title": "TCP server example", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-library/examples/custom_transport.rs", "destination": "examples/custom-transport.md", "title": "Custom transport example", "includeInFull": true, "optional": false },
+    { "source": "crates/assuan-library/examples/agent_info.rs", "destination": "examples/agent-info.md", "title": "Agent discovery example", "includeInFull": true, "optional": false },
+    { "source": "docs/publishing.md", "destination": "guides/publishing.md", "title": "Package verification", "includeInFull": false, "optional": false },
+    { "source": "docs/continuous-integration.md", "destination": "guides/ci.md", "title": "CI coverage", "includeInFull": false, "optional": false },
+    { "source": "fuzz/README.md", "destination": "guides/fuzz.md", "title": "Fuzzing scope", "includeInFull": false, "optional": false },
+    { "source": "LICENSE.md", "destination": "license.md", "title": "MIT license", "includeInFull": false, "optional": false },
+    { "source": "docs/releasing.md", "destination": "guides/releasing.md", "title": "Release operations", "includeInFull": false, "optional": true }
+  ]
+}

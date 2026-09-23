@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "crates": [
+    "assuan-sexpr", "assuan-protocol", "assuan-transport",
+    "assuan-client", "assuan-server", "assuan-macros", "assuan-library"
+  ],
+  "rust": "1.98.1",
+  "powershell": "7.6.6",
+  "versionPolicy": "stable-semver",
+  "tagPrefix": "v",
+  "branchPrefix": "release/v"
+}

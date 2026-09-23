@@ -33,9 +33,9 @@ try {
   $env:ASSUAN_GPG_CONNECT_AGENT = "$drive\bin\gpg-connect-agent.exe"
   $env:ASSUAN_GNUPG_REQUIRED = '1'
   if ($Workspace) {
-    & cargo test --workspace
+    & cargo test --locked --workspace
   } else {
-    & cargo test -p assuan-library --test interop_agent --test interop_server -- --nocapture
+    & cargo test --locked -p assuan-library --test interop_agent --test interop_server -- --nocapture
   }
   if ($LASTEXITCODE -ne 0) { throw 'GnuPG interoperability tests failed.' }
 }
